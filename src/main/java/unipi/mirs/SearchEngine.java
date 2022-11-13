@@ -60,8 +60,10 @@ public class SearchEngine {
 
             }
         }
-        System.out.println(ConsoleUX.CLS + ConsoleUX.FG_YELLOW + ConsoleUX.BOLD + "UOT MATTEMATTICALLI DU UI DU!");
-        System.out.println("DU UI LAIK TU UEIST TIME? 0,0001 milliseconds to print" + ConsoleUX.RESET);
+        System.out.println(ConsoleUX.CLS + ConsoleUX.FG_YELLOW + ConsoleUX.BOLD
+                + "UI NID TU EGZIT, UOT MATTEMMATTICCALLI DU UI DU? UI COMMPLITLLY FORMÀT D COMPIUTTER, BICOS:");
+        System.out.println(
+                "DU UI LAIK TU UEIST SPEIS? DU UI LAIK TU UEIST TIME? 0,0001 milliseconds to exit" + ConsoleUX.RESET);
         System.exit(0);
     }
 }
