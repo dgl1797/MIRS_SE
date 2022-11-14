@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.Scanner;
 import java.util.Map.Entry;
 
@@ -36,7 +37,8 @@ public class IndexBuilder {
   /*unresettable*/private int docLimit;
 
   // int[0] is the termid and the position where the postingList of the term starts; int[1] is the postingsList length
-  /*unresettable*/private HashMap<String, int[]> vocabulary;
+  /*unresettable*/private LinkedHashMap<String, int[]> vocabulary;
+  /*resettable*/private HashMap<String, HashMap<Integer, Integer>> postingLists;
   /*resettable*/private ArrayList<DocIndexType> documentIndex;
 
   public IndexBuilder(int docLimit, Scanner stdin) {
@@ -45,8 +47,9 @@ public class IndexBuilder {
     this.docCount = 0;
     this.chunknumber = 0;
     this.termCount = 0;
-    this.vocabulary = new HashMap<>();
+    this.vocabulary = new LinkedHashMap<>();
     this.documentIndex = new ArrayList<>();
+    this.postingLists = new HashMap<>();
   };
 
   public IndexBuilder(Scanner stdin) {
@@ -55,8 +58,9 @@ public class IndexBuilder {
     this.chunknumber = 0;
     this.termCount = 0;
     this.docLimit = 5000;
-    this.vocabulary = new HashMap<>();
+    this.vocabulary = new LinkedHashMap<>();
     this.documentIndex = new ArrayList<>();
+    this.postingLists = new HashMap<>();
   }
 
   /**
@@ -66,6 +70,7 @@ public class IndexBuilder {
     this.docCount = 0;
     this.chunknumber += 1;
     this.documentIndex.clear();
+    this.postingLists.clear();
   }
 
   /**
@@ -80,7 +85,14 @@ public class IndexBuilder {
     if (docCount == docLimit - 1) {
       System.out.println(ConsoleUX.FG_BLUE + ConsoleUX.BOLD + "parsed " + chunknumber + "th chunk:");
       for (Entry<String, int[]> en : vocabulary.entrySet()) {
-        System.out.println("{" + en.getKey() + ": " + "[" + en.getValue()[0] + ", " + en.getValue()[1] + "]" + "}");
+        String term = en.getKey();
+        System.out
+            .println(ConsoleUX.FG_BLUE + ConsoleUX.BOLD + term + " appearing in " + en.getValue()[1] + " documents");
+        for (Entry<Integer, Integer> pl : postingLists.get(term).entrySet()) {
+          System.out.print(pl.getKey() + ":" + pl.getValue() + "->");
+        }
+        System.out.println();
+        ConsoleUX.pause(true, stdin);
       }
       ConsoleUX.pause(true, stdin);
       // write();
@@ -89,8 +101,9 @@ public class IndexBuilder {
     String[] parts = document.split("\t");
     String docno = parts[0];
     String docbody = parts[1];
-    System.out.println(ConsoleUX.CLS + ConsoleUX.FG_BLUE + ConsoleUX.BOLD + "parsing document " + docno + " as id: "
-        + (docCount + 5000 * chunknumber));
+    int docid = docCount + 5000 * chunknumber;
+    System.out
+        .println(ConsoleUX.CLS + ConsoleUX.FG_BLUE + ConsoleUX.BOLD + "parsing document " + docno + " as id: " + docid);
     docbody = TextNormalizationFunctions.cleanText(docbody);
     int docLen = 0;
     HashSet<String> stopwords = new HashSet<>();
@@ -104,14 +117,46 @@ public class IndexBuilder {
       if (answ == "n")
         return false;
     } finally {
+      HashSet<String> alreadyAppeared = new HashSet<>();
       // tokenization+stopwords_removal+stemming process
       for (String t : docbody.split(" ")) {
         if (!stopwords.contains(t)) {
           t = TextNormalizationFunctions.ps.stem(t);
           docLen += 1;
-          int[] tcount = vocabulary.getOrDefault(t, new int[] { termCount++, 0 });
-          tcount[1] += 1;
-          vocabulary.put(t, tcount);
+          if (!vocabulary.containsKey(t)) {
+            vocabulary.put(t, new int[] { termCount++, 1 });
+            alreadyAppeared.add(t);
+            postingLists.put(t, new HashMap<>());
+            postingLists.get(t).put(docid, 1);
+          } else {
+            if (!alreadyAppeared.contains(t)) {
+              int[] vals = vocabulary.get(t);
+              vals[1] += 1;
+              vocabulary.put(t, vals);
+              if (!postingLists.containsKey(t)) {
+                postingLists.put(t, new HashMap<>());
+                postingLists.get(t).put(docid, 1);
+              } else {
+                if (!postingLists.get(t).containsKey(docid)) {
+                  postingLists.get(t).put(docid, 1);
+                } else {
+                  int fq = postingLists.get(t).get(docid);
+                  fq += 1;
+                  postingLists.get(t).put(docid, fq);
+                }
+              }
+              alreadyAppeared.add(t);
+            } else {
+              // document term's frequency
+              if (!postingLists.get(t).containsKey(docid)) {
+                postingLists.get(t).put(docid, 1);
+              } else {
+                int fq = postingLists.get(t).get(docid);
+                fq += 1;
+                postingLists.get(t).put(docid, fq);
+              }
+            }
+          }
         }
       }
       documentIndex.add(new DocIndexType(docno, docLen));
