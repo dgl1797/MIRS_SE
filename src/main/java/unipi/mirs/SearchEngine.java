@@ -57,14 +57,12 @@ public class SearchEngine {
                     ConsoleUX.CLS + ConsoleUX.BOLD + ConsoleUX.FG_BLUE + "Processing File..." + ConsoleUX.RESET);
             try (BufferedReader inreader = Files.newBufferedReader(Path.of(inputFile), StandardCharsets.UTF_8)) {
                 String document;
-                IndexBuilder ib = new IndexBuilder(5000, stdin);
+                IndexBuilder ib = new IndexBuilder(stdin);
                 while ((document = inreader.readLine()) != null) {
-                    // addDocument will automatically save as it reaches its limit and reset itself
                     if (!ib.addDocument(document)) {
                         return;
                     }
                 }
-                // ib.write(final=true); will write in files the data structures
             } catch (IOException e) {
                 System.out.println(ConsoleUX.FG_RED + ConsoleUX.BOLD + "Unable to initialize buffer for " + inputFile
                         + ":\n" + e.getMessage() + ConsoleUX.RESET);

@@ -1,13 +1,18 @@
 package unipi.mirs.components;
 
+import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.util.ArrayList;
+import java.io.RandomAccessFile;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Scanner;
 import java.util.Map.Entry;
 
 import unipi.mirs.graphics.ConsoleUX;
+import unipi.mirs.utilities.Constants;
 import unipi.mirs.utilities.TextNormalizationFunctions;
 
 /**
@@ -15,84 +20,37 @@ import unipi.mirs.utilities.TextNormalizationFunctions;
  * int[]> DocumentIndex represented by an ArrayList<String, int> InvertedIndex as an ArrayList<int[]>
  */
 public class IndexBuilder {
-
-  /**
-   * Auxiliary class to store the different types inside the ArrayList used for DocumentIndex
-   */
-  private class DocIndexType {
-    public String docno;
-    public int doclen;
-
-    public DocIndexType(String docno, int doclen) {
-      this.doclen = doclen;
-      this.docno = docno;
-    }
-  }
-
   private Scanner stdin;
-  /*resettable*/private int docCount;
-  /*unresettable*/private int chunknumber;
-  /*unresettable*/private int termCount;
-  /*unresettable*/private int docLimit;
+  private HashMap<String, int[]> vocabulary;
+  private RandomAccessFile raf;
 
-  // int[0] is the termid and the position where the postingList of the term starts; int[1] is the postingsList length
-  /*unresettable*/private HashMap<String, int[]> vocabulary;
-  /*resettable*/private ArrayList<DocIndexType> documentIndex;
+  private static int currentIdCount = 0;
+  private static int currentTermId = 0;
+  private static final Path INVIND_PATH = Paths.get(Constants.OUTPUT_DIR.toString(), "inverted_index.dat");
 
-  public IndexBuilder(int docLimit, Scanner stdin) {
+  public IndexBuilder(Scanner stdin) throws IOException {
     this.stdin = stdin;
-    this.docLimit = docLimit;
-    this.docCount = 0;
-    this.chunknumber = 0;
-    this.termCount = 0;
     this.vocabulary = new HashMap<>();
-    this.documentIndex = new ArrayList<>();
-  };
-
-  public IndexBuilder(Scanner stdin) {
-    this.stdin = stdin;
-    this.docCount = 0;
-    this.chunknumber = 0;
-    this.termCount = 0;
-    this.docLimit = 5000;
-    this.vocabulary = new HashMap<>();
-    this.documentIndex = new ArrayList<>();
-  }
-
-  /**
-   * performs the reset of the resettable parameters to clear some memory
-   */
-  private void reset() {
-    this.docCount = 0;
-    this.chunknumber += 1;
-    this.documentIndex.clear();
-  }
-
-  /**
-   * Parses the document to update the Data Structures up until this.docLimit where the method will update the files and
-   * reset the instance
-   * 
-   * @param document the new document to be parsed and added
-   * @return a boolean saying if the index building has been stopped before completion or not
-   */
-  public boolean addDocument(String document) {
-    // updates file if we reach the docLimit for the batch
-    if (docCount == docLimit - 1) {
-      System.out.println(ConsoleUX.FG_BLUE + ConsoleUX.BOLD + "parsed " + chunknumber + "th chunk:");
-      for (Entry<String, int[]> en : vocabulary.entrySet()) {
-        System.out.println("{" + en.getKey() + ": " + "[" + en.getValue()[0] + ", " + en.getValue()[1] + "]" + "}");
+    File invind = new File(INVIND_PATH.toString());
+    if (!invind.exists()) {
+      if (!invind.createNewFile()) {
+        throw new IOException("Impossible to create inverted index file");
       }
-      ConsoleUX.pause(true, stdin);
-      // write();
-      reset();
     }
+    this.raf = new RandomAccessFile(invind, "rw");
+  }
+
+  private void plWrite(HashMap<String, Integer> frequencies) {
+    for (Entry<String, Integer> tf : frequencies.entrySet()) {
+
+    }
+  }
+
+  public boolean addDocument(String document) {
     String[] parts = document.split("\t");
     String docno = parts[0];
     String docbody = parts[1];
-    System.out.println(ConsoleUX.CLS + ConsoleUX.FG_BLUE + ConsoleUX.BOLD + "parsing document " + docno + " as id: "
-        + (docCount + 5000 * chunknumber));
     docbody = TextNormalizationFunctions.cleanText(docbody);
-    int docLen = 0;
     HashSet<String> stopwords = new HashSet<>();
     try {
       stopwords = TextNormalizationFunctions.load_stopwords();
@@ -104,18 +62,24 @@ public class IndexBuilder {
       if (answ == "n")
         return false;
     } finally {
-      // tokenization+stopwords_removal+stemming process
+      int docLen = 0, docid = currentIdCount;
+      currentIdCount += 1;
+      HashMap<String, Integer> termfrequencies = new HashMap<>();
       for (String t : docbody.split(" ")) {
         if (!stopwords.contains(t)) {
-          t = TextNormalizationFunctions.ps.stem(t);
           docLen += 1;
-          int[] tcount = vocabulary.getOrDefault(t, new int[] { termCount++, 0 });
-          tcount[1] += 1;
-          vocabulary.put(t, tcount);
+          if (!termfrequencies.containsKey(t)) {
+            int[] vocVal = vocabulary.getOrDefault(t, new int[] { 0, 0 });
+            vocVal[0] = currentTermId++;
+            vocVal[1] += 1;
+            vocabulary.put(t, vocVal);
+            termfrequencies.put(t, 1);
+          } else {
+            termfrequencies.put(t, termfrequencies.get(t) + 1);
+          }
         }
       }
-      documentIndex.add(new DocIndexType(docno, docLen));
-      this.docCount += 1;
+      plWrite(termfrequencies);
     }
     return true;
   }
