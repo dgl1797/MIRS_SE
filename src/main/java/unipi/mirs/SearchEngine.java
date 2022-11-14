@@ -1,11 +1,16 @@
 package unipi.mirs;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Scanner;
 
+import unipi.mirs.components.IndexBuilder;
 import unipi.mirs.graphics.ConsoleUX;
 import unipi.mirs.graphics.Menu;
 import unipi.mirs.utilities.Constants;
@@ -44,6 +49,38 @@ public class SearchEngine {
             readCompressed = true;
     }
 
+    private static void buildIndex() {
+        if (readCompressed) {
+
+        } else {
+            System.out.println(
+                    ConsoleUX.CLS + ConsoleUX.BOLD + ConsoleUX.FG_BLUE + "Processing File..." + ConsoleUX.RESET);
+            try (BufferedReader inreader = Files.newBufferedReader(Path.of(inputFile), StandardCharsets.UTF_8)) {
+                String document;
+                IndexBuilder ib = new IndexBuilder(5000, stdin);
+                while ((document = inreader.readLine()) != null) {
+                    // addDocument will automatically save as it reaches its limit and reset itself
+                    if (!ib.addDocument(document)) {
+                        return;
+                    }
+                }
+                // ib.write(final=true); will write in files the data structures
+            } catch (IOException e) {
+                System.out.println(ConsoleUX.FG_RED + ConsoleUX.BOLD + "Unable to initialize buffer for " + inputFile
+                        + ":\n" + e.getMessage() + ConsoleUX.RESET);
+                ConsoleUX.pause(false, stdin);
+            }
+        }
+        // open inputfile using BufferedReader or ZipBufferedReader based on compressedRead
+        // if compressed file, decompress it and move it to a normal Buffered stream
+        // read up to 5000 lines
+        //   create IndexBuilder instance
+        //   normilize docbodies
+        //   update IndexBuilder instance
+        //   write IndexBuilder to file
+        //   reset IndexBuilder instance
+    }
+
     public static void main(String[] args) throws IOException {
         // Save index in a file, compressed index in another one to avoid re-building index every time
         Menu menu = new Menu(stdin, "Change Input File", "Build Index", "Compress Inverted Index", "Search", "Exit");
@@ -53,7 +90,7 @@ public class SearchEngine {
             if (opt == 0) {
                 changeInputFile();
             } else if (opt == 1) {
-
+                buildIndex();
             } else if (opt == 2) {
 
             } else if (opt == 3) {
