@@ -52,33 +52,19 @@ public class SearchEngine {
     private static void buildIndex() {
         if (readCompressed) {
 
-        } else {
-            System.out.println(
-                    ConsoleUX.CLS + ConsoleUX.BOLD + ConsoleUX.FG_BLUE + "Processing File..." + ConsoleUX.RESET);
-            try (BufferedReader inreader = Files.newBufferedReader(Path.of(inputFile), StandardCharsets.UTF_8)) {
-                String document;
-                IndexBuilder ib = new IndexBuilder(5000, stdin);
-                while ((document = inreader.readLine()) != null) {
-                    // addDocument will automatically save as it reaches its limit and reset itself
-                    if (!ib.addDocument(document)) {
-                        return;
-                    }
-                }
-                // ib.write(final=true); will write in files the data structures
-            } catch (IOException e) {
-                System.out.println(ConsoleUX.FG_RED + ConsoleUX.BOLD + "Unable to initialize buffer for " + inputFile
-                        + ":\n" + e.getMessage() + ConsoleUX.RESET);
-                ConsoleUX.pause(false, stdin);
-            }
         }
-        // open inputfile using BufferedReader or ZipBufferedReader based on compressedRead
-        // if compressed file, decompress it and move it to a normal Buffered stream
-        // read up to 5000 lines
-        //   create IndexBuilder instance
-        //   normilize docbodies
-        //   update IndexBuilder instance
-        //   write IndexBuilder to file
-        //   reset IndexBuilder instance
+        System.out.println(ConsoleUX.CLS + ConsoleUX.BOLD + ConsoleUX.FG_BLUE + "Processing File..." + ConsoleUX.RESET);
+        try (BufferedReader inreader = Files.newBufferedReader(Path.of(inputFile), StandardCharsets.UTF_8)) {
+            String document;
+            IndexBuilder vb = new IndexBuilder(stdin);
+            while ((document = inreader.readLine()) != null) {
+                vb.addDocument(document);
+            }
+        } catch (IOException e) {
+            System.out.println(ConsoleUX.FG_RED + ConsoleUX.BOLD + "Unable to initialize buffer for " + inputFile
+                    + ":\n" + e.getMessage() + ConsoleUX.RESET);
+            ConsoleUX.pause(false, stdin);
+        }
     }
 
     public static void main(String[] args) throws IOException {
