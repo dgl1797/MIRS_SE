@@ -60,6 +60,8 @@ public class SearchEngine {
             while ((document = inreader.readLine()) != null) {
                 vb.addDocument(document);
             }
+            vb.closeFile();
+            vb.plWrite();
         } catch (IOException e) {
             System.out.println(ConsoleUX.FG_RED + ConsoleUX.BOLD + "Unable to initialize buffer for " + inputFile
                     + ":\n" + e.getMessage() + ConsoleUX.RESET);
@@ -69,7 +71,8 @@ public class SearchEngine {
 
     public static void main(String[] args) throws IOException {
         // Save index in a file, compressed index in another one to avoid re-building index every time
-        Menu menu = new Menu(stdin, "Change Input File", "Build Index", "Compress Inverted Index", "Search", "Exit");
+        Menu menu = new Menu(stdin, "Change Input File", "Build Index", "Compress Inverted Index", "Search", "Exit",
+                "Single Function Test");
         int opt = 0;
         while ((opt = menu.printMenu(
                 ConsoleUX.FG_BLUE + ConsoleUX.BOLD + "Selected File: " + inputFile + ConsoleUX.RESET)) != 4) {
@@ -80,6 +83,8 @@ public class SearchEngine {
             } else if (opt == 2) {
 
             } else if (opt == 3) {
+
+            } else if (opt == 5) {
 
             }
         }
