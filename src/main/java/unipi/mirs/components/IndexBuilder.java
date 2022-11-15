@@ -57,7 +57,7 @@ public class IndexBuilder {
     File outfile = new File(Paths.get(Constants.OUTPUT_DIR.toString(), "inverted_index.dat").toString());
     File vocfile = new File(Paths.get(Constants.OUTPUT_DIR.toString(), "vocabulary.dat").toString());
     File plDebug = new File(Paths.get(Constants.OUTPUT_DIR.toString(), "invind_debug.txt").toString());
-    boolean isDebug = false;
+    boolean isDebug = true; // change to false and uncomment
     {
       System.out
           .print(ConsoleUX.FG_BLUE + ConsoleUX.BOLD + "Do you want to debug the execution? [Y/n]: " + ConsoleUX.RESET);
@@ -108,7 +108,6 @@ public class IndexBuilder {
         if (isDebug) {
           debugstream.write(String.format("%d:%d - ", plnode[0], plnode[1]));
         }
-        ConsoleUX.pause(false, stdin);
         currentByte += 2 * Integer.BYTES;
       }
       if (isDebug) {

@@ -62,6 +62,8 @@ public class SearchEngine {
             }
             vb.closeFile();
             vb.plWrite();
+            System.out.println(ConsoleUX.FG_GREEN + ConsoleUX.BOLD + "Index Builded succesfully.");
+            ConsoleUX.pause(true, stdin);
         } catch (IOException e) {
             System.out.println(ConsoleUX.FG_RED + ConsoleUX.BOLD + "Unable to initialize buffer for " + inputFile
                     + ":\n" + e.getMessage() + ConsoleUX.RESET);
