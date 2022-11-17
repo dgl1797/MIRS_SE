@@ -155,7 +155,7 @@ public class IndexBuilderTest {
     // here docid is initialized at currentDocID then the increase happens
     int docid = currentDocID++;
     for (String t : docbody.split(" ")) {
-      if (!stopwords.contains(t)) {
+      if (!stopwords.contains(t) && t.length() > 1) {
         doclen++;
         t = TextNormalizationFunctions.ps.stem(t);
         if (!chunkMap.containsKey(t)) {
