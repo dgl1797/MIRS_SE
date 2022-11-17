@@ -8,8 +8,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
-import java.util.BitSet;
-import java.util.HashMap;
 import java.util.Scanner;
 
 import unipi.mirs.components.IndexBuilder;
