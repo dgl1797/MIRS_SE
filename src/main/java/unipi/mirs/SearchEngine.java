@@ -11,6 +11,7 @@ import java.util.Arrays;
 import java.util.Scanner;
 
 import unipi.mirs.components.IndexBuilder;
+import unipi.mirs.components.IndexBuilderTest;
 import unipi.mirs.graphics.ConsoleUX;
 import unipi.mirs.graphics.Menu;
 import unipi.mirs.utilities.Constants;
@@ -71,6 +72,28 @@ public class SearchEngine {
         }
     }
 
+    private static void buildIndexTest() {
+        if (readCompressed) {
+
+        }
+        System.out.println(ConsoleUX.CLS + ConsoleUX.BOLD + ConsoleUX.FG_BLUE + "Processing File..." + ConsoleUX.RESET);
+        try (BufferedReader inreader = Files.newBufferedReader(Path.of(inputFile), StandardCharsets.UTF_8)) {
+            String document;
+            IndexBuilderTest vb = new IndexBuilderTest(stdin, 1_000_000);
+            while ((document = inreader.readLine()) != null) {
+                vb.addDocument(document);
+            }
+            vb.write_chunk();
+            vb.closeDocTableFile();
+            System.out.println(ConsoleUX.FG_GREEN + ConsoleUX.BOLD + "Index Builded succesfully.");
+            ConsoleUX.pause(true, stdin);
+        } catch (IOException e) {
+            System.out.println(ConsoleUX.FG_RED + ConsoleUX.BOLD + "Unable to initialize buffer for " + inputFile
+                    + ":\n" + e.getMessage() + ConsoleUX.RESET);
+            ConsoleUX.pause(false, stdin);
+        }
+    }
+
     public static void main(String[] args) throws IOException {
         // Save index in a file, compressed index in another one to avoid re-building index every time
         Menu menu = new Menu(stdin, "Change Input File", "Build Index", "Compress Inverted Index", "Search", "Exit",
@@ -87,7 +110,7 @@ public class SearchEngine {
             } else if (opt == 3) {
 
             } else if (opt == 5) {
-                // function to be tested and debugged here
+                buildIndexTest();
             }
         }
         System.out.println(ConsoleUX.CLS + ConsoleUX.FG_YELLOW + ConsoleUX.BOLD
