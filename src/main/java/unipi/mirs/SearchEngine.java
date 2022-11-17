@@ -8,6 +8,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
+import java.util.BitSet;
+import java.util.HashMap;
 import java.util.Scanner;
 
 import unipi.mirs.components.IndexBuilder;
@@ -86,6 +88,11 @@ public class SearchEngine {
             vb.write_chunk();
             vb.closeDocTableFile();
             System.out.println(ConsoleUX.FG_GREEN + ConsoleUX.BOLD + "Index Builded succesfully.");
+            System.out.println(ConsoleUX.FG_GREEN + ConsoleUX.BOLD + "ChunkMap produced:");
+            HashMap<String, BitSet> chunkmap = vb.getChunkMap();
+            for (String t : chunkmap.keySet()) {
+                System.out.print(t + ": " + chunkmap.get(t).toString());
+            }
             ConsoleUX.pause(true, stdin);
         } catch (IOException e) {
             System.out.println(ConsoleUX.FG_RED + ConsoleUX.BOLD + "Unable to initialize buffer for " + inputFile
