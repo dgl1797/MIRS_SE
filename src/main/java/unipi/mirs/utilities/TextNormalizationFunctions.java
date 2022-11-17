@@ -18,8 +18,9 @@ public final class TextNormalizationFunctions {
   static public String cleanText(String txt) {
     //@formatter:off
     return txt.toLowerCase().replaceAll("[^\\p{L}\\s]+", " ")
-        .replaceAll("[\\u00c0-\\u00FF][\\u0080-\\u00A0]", " ")
-        .replaceAll("\\s+", " ").trim();
+        .replaceAll("ã â â", " ")
+        .replaceAll("â", "")
+        .replaceAll("[\\s]+", " ").trim();
     //@formatter:on
   }
 
