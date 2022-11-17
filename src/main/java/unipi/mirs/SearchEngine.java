@@ -84,6 +84,7 @@ public class SearchEngine {
                 vb.addDocument(document);
             }
             vb.write_chunk();
+            vb.saveChunkMap();
             vb.closeDocTableFile();
             System.out.println(ConsoleUX.FG_GREEN + ConsoleUX.BOLD + "Index Builded succesfully.");
             ConsoleUX.pause(true, stdin);

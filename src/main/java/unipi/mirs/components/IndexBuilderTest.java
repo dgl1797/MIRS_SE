@@ -11,9 +11,9 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.BitSet;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Scanner;
+import java.util.TreeMap;
 import java.util.Map.Entry;
 
 import unipi.mirs.graphics.ConsoleUX;
@@ -26,12 +26,12 @@ public class IndexBuilderTest {
   private BufferedWriter doctableFile;
   private boolean debugmode = false;
   // int[0] is the docid and int[1] is the term frequency in the chunk
-  /*resettable*/private HashMap<String, ArrayList<int[]>> indexChunk;
-  /*unresettable*/private HashMap<String, BitSet> chunkMap;
+  /*resettable*/private TreeMap<String, ArrayList<int[]>> indexChunk;
+  /*unresettable*/private TreeMap<String, BitSet> chunkMap;
 
   private int chunkID = 0;
   private int currentDocID = 0;
-  private int chunkSize = 880_000; // 10 chunks for 8.8M
+  private int chunkSize = 0; // 10 chunks for 8.8M
 
   private void dtWrite(String docno, int docid, int doclen) throws IOException {
     String doctcontent = String.format("%s\t%d %d\n", docno, docid, doclen);
@@ -41,8 +41,8 @@ public class IndexBuilderTest {
   public IndexBuilderTest(Scanner stdin, int chunkSize) throws IOException {
     this.stdin = stdin;
     this.stopwords = TextNormalizationFunctions.load_stopwords();
-    this.indexChunk = new HashMap<>();
-    this.chunkMap = new HashMap<>();
+    this.indexChunk = new TreeMap<>();
+    this.chunkMap = new TreeMap<>();
     this.chunkSize = chunkSize;
     File dtf = new File(Paths.get(Constants.OUTPUT_DIR.toString(), "doctable_test.dat").toString());
     if (dtf.exists()) {
@@ -63,8 +63,19 @@ public class IndexBuilderTest {
     this.doctableFile = new BufferedWriter(new FileWriter(dtf));
   }
 
-  public HashMap<String, BitSet> getChunkMap() {
-    return this.chunkMap;
+  public void saveChunkMap() throws IOException {
+    File cmf = new File(Paths.get(Constants.OUTPUT_DIR.toString(), "chunk_map.dat").toString());
+    if (cmf.exists()) {
+      cmf.delete();
+    }
+    cmf.createNewFile();
+    BufferedWriter cmfw = new BufferedWriter(new FileWriter(cmf));
+    for (String k : chunkMap.keySet()) {
+      cmfw.write(k);
+      cmfw.write(chunkMap.get(k).toString());
+      cmfw.write("\n");
+    }
+    cmfw.close();
   }
 
   public void closeDocTableFile() throws IOException {
@@ -155,7 +166,7 @@ public class IndexBuilderTest {
     // here docid is initialized at currentDocID then the increase happens
     int docid = currentDocID++;
     for (String t : docbody.split(" ")) {
-      if (!stopwords.contains(t) && t.length() > 1) {
+      if (!stopwords.contains(t) && t.trim().length() > 1) {
         doclen++;
         t = TextNormalizationFunctions.ps.stem(t);
         if (!chunkMap.containsKey(t)) {
