@@ -11,7 +11,6 @@ import java.util.Arrays;
 import java.util.Scanner;
 
 import unipi.mirs.components.IndexBuilder;
-import unipi.mirs.components.IndexBuilderTest;
 import unipi.mirs.graphics.ConsoleUX;
 import unipi.mirs.graphics.Menu;
 import unipi.mirs.utilities.Constants;
@@ -50,72 +49,67 @@ public class SearchEngine {
             readCompressed = true;
     }
 
-    private static void buildIndex() {
-        if (readCompressed) {
-
-        }
-        System.out.println(ConsoleUX.CLS + ConsoleUX.BOLD + ConsoleUX.FG_BLUE + "Processing File..." + ConsoleUX.RESET);
-        try (BufferedReader inreader = Files.newBufferedReader(Path.of(inputFile), StandardCharsets.UTF_8)) {
-            String document;
-            IndexBuilder vb = new IndexBuilder(stdin);
-            while ((document = inreader.readLine()) != null) {
-                vb.addDocument(document);
-            }
-            vb.closeFile();
-            vb.plWrite();
-            System.out.println(ConsoleUX.FG_GREEN + ConsoleUX.BOLD + "Index Builded succesfully.");
-            ConsoleUX.pause(true, stdin);
+    private static int collectionSize() {
+        System.out.println(ConsoleUX.CLS + ConsoleUX.FG_BLUE + ConsoleUX.BOLD
+                + "Counting number of documents in the collection...");
+        try (BufferedReader inReader = Files.newBufferedReader(Path.of(inputFile), StandardCharsets.UTF_8)) {
+            int docCounter = 0;
+            while (inReader.readLine() != null)
+                docCounter += 1;
+            return docCounter;
         } catch (IOException e) {
             System.out.println(ConsoleUX.FG_RED + ConsoleUX.BOLD + "Unable to initialize buffer for " + inputFile
                     + ":\n" + e.getMessage() + ConsoleUX.RESET);
             ConsoleUX.pause(false, stdin);
+            return -1;
         }
     }
 
-    private static void buildIndexTest() {
+    private static void buildIndex(int collectionSize) {
         if (readCompressed) {
 
         }
-        System.out.println(ConsoleUX.CLS + ConsoleUX.BOLD + ConsoleUX.FG_BLUE + "Processing File..." + ConsoleUX.RESET);
+        System.out.println(ConsoleUX.BOLD + ConsoleUX.FG_BLUE + "Processing File..." + ConsoleUX.RESET);
         try (BufferedReader inreader = Files.newBufferedReader(Path.of(inputFile), StandardCharsets.UTF_8)) {
             String document;
-            IndexBuilderTest vb = new IndexBuilderTest(stdin, 1_000_000);
+            IndexBuilder vb = new IndexBuilder(stdin, 10, collectionSize);
             while ((document = inreader.readLine()) != null) {
                 vb.addDocument(document);
             }
             vb.write_chunk();
-            vb.saveChunkMap();
-            vb.closeDocTableFile();
+            vb.save_lexicon();
+            vb.closeDocTable();
             System.out.println(ConsoleUX.FG_GREEN + ConsoleUX.BOLD + "Index Builded succesfully.");
             ConsoleUX.pause(true, stdin);
         } catch (IOException e) {
-            System.out.println(ConsoleUX.FG_RED + ConsoleUX.BOLD + "Unable to initialize buffer for " + inputFile
-                    + ":\n" + e.getMessage() + ConsoleUX.RESET);
+            System.out.println(ConsoleUX.FG_RED + ConsoleUX.BOLD + "Unable to create index for " + inputFile + ":\n"
+                    + e.getMessage() + ConsoleUX.RESET);
             ConsoleUX.pause(false, stdin);
         }
     }
 
     public static void main(String[] args) throws IOException {
         // Save index in a file, compressed index in another one to avoid re-building index every time
-        Menu menu = new Menu(stdin, "Change Input File", "Build Index", "Compress Inverted Index", "Search", "Exit",
-                "Single Function Test");
+        Menu menu = new Menu(stdin, "Change Input File", "Build Index", "Compress Inverted Index", "Search", "Exit");
         int opt = 0;
         while ((opt = menu.printMenu(
                 ConsoleUX.FG_BLUE + ConsoleUX.BOLD + "Selected File: " + inputFile + ConsoleUX.RESET)) != 4) {
             if (opt == 0) {
                 changeInputFile();
             } else if (opt == 1) {
-                buildIndex();
+                int collectionSize = collectionSize();
+                if (collectionSize == -1) {
+                    continue;
+                }
+                buildIndex(collectionSize);
             } else if (opt == 2) {
 
             } else if (opt == 3) {
 
-            } else if (opt == 5) {
-                buildIndexTest();
             }
         }
         System.out.println(ConsoleUX.CLS + ConsoleUX.FG_YELLOW + ConsoleUX.BOLD
-                + "UI NID TU EGZIT, UOT MATTEMMATTICCALLI DU UI DU? UI COMMPLITLLY FORMÀT D COMPIUTTER, BICOS:");
+                + "UI NID TU EGZIT, UOT MATTEMMATTICCALLI DU UI DU? UI COMMPLITLLY FORMÀT D COMPIUTTER, UAAI?");
         System.out.println(
                 "DU UI LAIK TU UEIST SPEIS? DU UI LAIK TU UEIST TIME? 0,0001 milliseconds to exit" + ConsoleUX.RESET);
         System.exit(0);
