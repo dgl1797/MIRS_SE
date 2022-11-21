@@ -72,14 +72,28 @@ public class SearchEngine {
         System.out.println(ConsoleUX.BOLD + ConsoleUX.FG_BLUE + "Processing File..." + ConsoleUX.RESET);
         try (BufferedReader inreader = Files.newBufferedReader(Path.of(inputFile), StandardCharsets.UTF_8)) {
             String document;
-            IndexBuilder vb = new IndexBuilder(stdin, 10, collectionSize);
+            IndexBuilder vb = new IndexBuilder(stdin);
             while ((document = inreader.readLine()) != null) {
                 vb.addDocument(document);
             }
             vb.write_chunk();
-            vb.save_lexicon();
             vb.closeDocTable();
             System.out.println(ConsoleUX.FG_GREEN + ConsoleUX.BOLD + "Index Builded succesfully.");
+            ConsoleUX.pause(true, stdin);
+            System.out.println(ConsoleUX.BOLD + ConsoleUX.FG_BLUE + "Merging Chunks..." + ConsoleUX.RESET);
+            int nchunks = vb.getNChunks();
+            boolean wasEven = false;
+            //@formatter:off
+            for (int windowsize = nchunks; windowsize > 0; windowsize = (wasEven ? (windowsize / 2) - 1 : (windowsize / 2))) {
+                int assignIndex = 0;
+                for (int left = 0; left < nchunks; left += 2) {
+                    int right = Math.min(left + 1, nchunks - 1);
+                    vb.merge(left, right, assignIndex);
+                    assignIndex++;
+                }
+                wasEven = (windowsize % 2 == 0);
+            }
+            System.out.println(ConsoleUX.BOLD + ConsoleUX.FG_GREEN + "Merged " + nchunks + " Chunks" + ConsoleUX.RESET);
             ConsoleUX.pause(true, stdin);
         } catch (IOException e) {
             System.out.println(ConsoleUX.FG_RED + ConsoleUX.BOLD + "Unable to create index for " + inputFile + ":\n"
