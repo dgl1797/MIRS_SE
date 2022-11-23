@@ -26,15 +26,23 @@ public class IndexBuilder {
   private Scanner stdin;
 
   private boolean debugmode = false;
-  private HashSet<String> stopwords;
-  private BufferedWriter doctable;
-  private int currentDocID = 0;
-  private int currentChunkID = 0;
+  /*loaded once for the entire building process*/ private HashSet<String> stopwords;
+  /*opened once for the entire building process*/ private BufferedWriter doctable;
+  /*resettable*/ private int currentDocID = 0;
+  /*unresettable*/ private int currentChunkID = 0;
   private static final int CHUNKSIZE = 1_000;
 
   // int[0] is the docid, int[1] the term frequency in the docid
-  private TreeMap<String, ArrayList<int[]>> chunk;
+  /*resettable*/ private TreeMap<String, ArrayList<int[]>> chunk;
 
+  /**
+   * Helper function to write the next document in the doctable file
+   * 
+   * @param docno  docno of the document to be added
+   * @param docid  mapped docid for that docno
+   * @param doclen total length of the document's body
+   * @throws IOException
+   */
   private void write_doctable(String docno, int docid, int doclen) throws IOException {
     String doctcontent = String.format("%s\t%d %d\n", docno, docid, doclen);
     this.doctable.write(doctcontent);
@@ -66,6 +74,13 @@ public class IndexBuilder {
     this.chunk = new TreeMap<>();
   }
 
+  /**
+   * adds a single document to the current chunk's data structures, increasing the currentDocID at each call and calling
+   * the write_chunk function if the chunk's limit is reached
+   * 
+   * @param document the document to be added as a string in the format docno\tdocbody
+   * @throws IOException
+   */
   public void addDocument(String document) throws IOException {
     String[] parts = document.split("\t");
     String docno = parts[0];
@@ -102,6 +117,12 @@ public class IndexBuilder {
     }
   }
 
+  /**
+   * writes a chunk into a file with currentChunkID, then clears all the unnecessary data structures for the next chunk
+   * to be processed
+   * 
+   * @throws IOException
+   */
   public void write_chunk() throws IOException {
     if (currentDocID == 0)
       return;
@@ -167,14 +188,33 @@ public class IndexBuilder {
     currentDocID = 0;
   }
 
+  /**
+   * closes the doctable file
+   * 
+   * @throws IOException
+   */
   public void closeDocTable() throws IOException {
     this.doctable.close();
   }
 
+  /**
+   * @return currentChunkID of the builder
+   */
   public int getNChunks() {
     return this.currentChunkID;
   }
 
+  /**
+   * Helper function that gets the filepath of left, right and tmp chunks, checking also if it is debug file and if
+   * files are correctly organized in data/output folder
+   * 
+   * @param base  the base file name from which debug file is recognized from base.equals("debug")
+   * @param left  the chunkID of the left chunk
+   * @param right the chunkID of the right chunk
+   * @return a 3-sized array of Files where File[0] is the left chunk, File[1] is the right chunk and File[2] is the tmp
+   *         file
+   * @throws IOException
+   */
   private File[] getFiles(String base, int left, int right) throws IOException {
     String extension = (base.equals("debug")) ? "dbg" : "dat";
     Path[] resultPaths = new Path[] {
@@ -195,6 +235,13 @@ public class IndexBuilder {
     return resultFiles;
   }
 
+  /**
+   * Helper function to rename a file in p1 to a file in p2
+   * 
+   * @param p1 the origin path
+   * @param p2 the destination path
+   * @throws IOException
+   */
   private void rename(Path p1, Path p2) throws IOException {
     File f1 = new File(p1.toString());
     if (!f1.exists())
@@ -206,11 +253,25 @@ public class IndexBuilder {
     f1.renameTo(f2);
   }
 
+  /**
+   * Helper function to split the %d-%d of a posting into docid-plLength
+   * 
+   * @param componentsPart the string in the format "%d-%d"
+   * @return the int[] where [0] is the docid and [1] is the plLength
+   */
   private int[] getComponents(String componentsPart) {
     String[] scomponents = componentsPart.split("-");
     return new int[] { Integer.parseInt(scomponents[0]), Integer.parseInt(scomponents[1]) };
   }
 
+  /**
+   * Helper function to get the new file name, check if it already exists and if it is the debug file
+   * 
+   * @param base     file name from which debug file is recognized if equals to "debug"
+   * @param newindex the new chunkID to be assigned to the final file name
+   * @return a File object having the correct path and the newindex attached as chunkID
+   * @throws IOException
+   */
   private File getNewFileName(String base, int newindex) throws IOException {
     String extension = base.equals("debug") ? "dbg" : "dat";
     Path newPath = Paths.get(Constants.OUTPUT_DIR.toString(), String.format("%s_%d.%s", base, newindex, extension));
@@ -221,6 +282,12 @@ public class IndexBuilder {
     return newFilename;
   }
 
+  /**
+   * converts a ByteBuffer to a string
+   * 
+   * @param ib the ByteBuffer
+   * @return the string composed by all the integers in the ByteBuffer
+   */
   private String byteBufferToString(ByteBuffer ib) {
     int nextint;
     String rString = "";
@@ -231,6 +298,18 @@ public class IndexBuilder {
     return rString;
   }
 
+  /**
+   * Loads the entire remaining content of a buffered chunk into the merged chunk
+   * 
+   * @param lexicon     the lexicon of the chunk to be loaded into the merged chunk
+   * @param invindex    the inverted index of the chunk to be loaded into the merged chunk
+   * @param newLexicon  the merged lexicon stream
+   * @param newInvindex the merged inverted index stream
+   * @param newDebug    the debug file of the merging
+   * @param currentByte the byte from which the load needs to be started
+   * @param currentTerm the last term read from lexicon
+   * @throws IOException
+   */
   private void loadFileinto(BufferedReader lexicon, FileInputStream invindex, BufferedWriter newLexicon,
       FileOutputStream newInvindex, BufferedWriter newDebug, int currentByte, String currentTerm) throws IOException {
     do {
@@ -247,6 +326,15 @@ public class IndexBuilder {
     } while ((currentTerm = lexicon.readLine()) != null);
   }
 
+  /**
+   * Merges two chunks into one, opening lexicon and inverted index for both left and right terms, then writes a new
+   * debug file from the resulting file
+   * 
+   * @param li       the chunkID of the left chunk
+   * @param ri       the chunkID of the right chunk
+   * @param newindex the index to be assigned at the resulting file
+   * @throws IOException
+   */
   public void merge(int li, int ri, int newindex) throws IOException {
     if (li == ri) {
       // just rename the three needed files into *.newindex
@@ -280,39 +368,29 @@ public class IndexBuilder {
       String rightTerm = lexicons[1].readLine();
       int currentByte = 0;
       while (leftTerm != null || rightTerm != null) {
-        // System.out.println(ConsoleUX.FG_BLUE + ConsoleUX.BOLD + "Actual position: " + currentByte);
-        // System.out.println("left: " + leftTerm + " right: " + rightTerm);
         if (leftTerm == null) {
-          // System.out.println("Ended all the left terms");
           // only rightTerms remain
           loadFileinto(lexicons[1], invindexes[1], newLexicon, newInvindex, debugWriter, currentByte, rightTerm);
           break;
         }
         if (rightTerm == null) {
-          // System.out.println("Ended all the right terms");
           // only leftTerms remain
           loadFileinto(lexicons[0], invindexes[0], newLexicon, newInvindex, debugWriter, currentByte, leftTerm);
           break;
         }
-        // in the middle 
+        // in the middle of the parsing
         String[] parts = leftTerm.split("\t");
         String lterm = parts[0];
         int[] lcomponents = getComponents(parts[1]);
         parts = rightTerm.split("\t");
         String rterm = parts[0];
         int[] rcomponents = getComponents(parts[1]);
-        // System.out.println("comparing " + lterm + " with " + rterm);
         if (lterm.equals(rterm)) {
-          // System.out.println("equals");
           // concatenate right's posting to left's posting
           byte[] bl = invindexes[0].readNBytes(lcomponents[1] * 2 * Integer.BYTES);
           byte[] br = invindexes[1].readNBytes(rcomponents[1] * 2 * Integer.BYTES);
-          // System.err.println("got left pl of " + bl.length + " bytes and right pl of " + br.length + " bytes");
           byte[] result = ByteBuffer.allocate(bl.length + br.length).put(bl).put(br).array();
-          // System.out.println("merged into a buffer of " + result.length + " bytes");
           newLexicon.write(String.format("%s\t%d-%d\n", lterm, currentByte, lcomponents[1] + rcomponents[1]));
-          // System.out.println("Wrote into lexicon new term: " + lterm + " at byte: " + currentByte + " with plLength: "
-          //     + lcomponents[1] + rcomponents[1]);
           newInvindex.write(result);
           if (debugmode) {
             debugWriter.write(String.format("%s\t%d -> %s\n", lterm, lcomponents[1] + rcomponents[1],
@@ -322,12 +400,9 @@ public class IndexBuilder {
           rightTerm = lexicons[1].readLine();
           currentByte += result.length;
         } else if (lterm.compareTo(rterm) < 0) {
-          // System.out.println(lterm + " comes first");
           // lterm comes before rterm
           byte[] bl = invindexes[0].readNBytes(lcomponents[1] * 2 * Integer.BYTES);
-          // System.out.println("got a pl of " + bl.length + " bytes");
           newLexicon.write(String.format("%s\t%d-%d\n", lterm, currentByte, lcomponents[1]));
-          // System.out.println("wrote " + lterm + " in byte " + currentByte + " with plLength of " + lcomponents[1]);
           newInvindex.write(bl);
           if (debugmode) {
             debugWriter
@@ -336,12 +411,9 @@ public class IndexBuilder {
           leftTerm = lexicons[0].readLine();
           currentByte += bl.length;
         } else {
-          // System.out.println(rterm + " comes first");
           // rterm comes before rterm
           byte[] br = invindexes[1].readNBytes(rcomponents[1] * 2 * Integer.BYTES);
-          // System.out.println("got a pl of " + br.length + " bytes");
           newLexicon.write(String.format("%s\t%d-%d\n", rterm, currentByte, rcomponents[1]));
-          // System.out.println("wrote " + rterm + " at byte " + currentByte + " with a plLength of " + rcomponents[1]);
           newInvindex.write(br);
           if (debugmode) {
             debugWriter
