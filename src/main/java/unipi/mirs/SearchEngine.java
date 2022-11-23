@@ -68,19 +68,28 @@ public class SearchEngine {
             vb.closeDocTable();
             System.out.println(ConsoleUX.FG_GREEN + ConsoleUX.BOLD + "Index Builded succesfully.");
             ConsoleUX.pause(true, stdin);
-            System.out.println(ConsoleUX.BOLD + ConsoleUX.FG_BLUE + "Merging Chunks..." + ConsoleUX.RESET);
             int nchunks = vb.getNChunks();
-            boolean wasEven = true;
+            System.out.println(
+                    ConsoleUX.BOLD + ConsoleUX.FG_BLUE + "Merging " + nchunks + " Chunks..." + ConsoleUX.RESET);
+            boolean remainingChunk = false;
             //@formatter:off
             for (int windowsize = nchunks; windowsize > 0; windowsize = (int)Math.floor(windowsize/2)) {
-                int limit = wasEven ? windowsize-1 : windowsize;
+                // reset the chunkID to 0
                 int assignIndex = 0;
-                for (int left = 0; left <= limit; left += 2) {
-                    int right = Math.min(left + 1, limit);
+                // windowsize will be the previous windowsize/2 + the eventual odd chunk if windowsize was odd
+                windowsize = remainingChunk ? windowsize+1 : windowsize;
+                if(windowsize == 1) break; // we have a single chunk which means we don't need to merge anymore
+                for (int left = 0; left < windowsize; left += 2) {
+                    // if left == right we will just rename the chunk and bring it to the next merge iteration
+                    int right = Math.min(left + 1, windowsize-1);
+                    // merges the next two chunks into chunkid assignindex
                     vb.merge(left, right, assignIndex);
+                    ConsoleUX.pause(true, stdin);
+                    // increase the chunkID
                     assignIndex++;
                 }
-                wasEven = (windowsize % 2 == 0);
+                // calculating if there was a remaining chunk that we need to consider in the next iteration
+                remainingChunk = ((windowsize%2) != 0);
             }
             System.out.println(ConsoleUX.BOLD + ConsoleUX.FG_GREEN + "Merged " + nchunks + " Chunks" + ConsoleUX.RESET);
             ConsoleUX.pause(true, stdin);
@@ -111,7 +120,8 @@ public class SearchEngine {
                 "Exit");
         int opt = 0;
         while ((opt = menu.printMenu(
-                ConsoleUX.FG_BLUE + ConsoleUX.BOLD + "Selected File: " + inputFile + ConsoleUX.RESET)) != 4) {
+                ConsoleUX.FG_BLUE + ConsoleUX.BOLD + "Selected File: " + inputFile + ConsoleUX.RESET)) != menu
+                        .exitMenuOption()) {
             if (opt == 0) {
                 changeInputFile();
             } else if (opt == 1) {

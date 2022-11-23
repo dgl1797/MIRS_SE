@@ -8,11 +8,13 @@ import java.util.Scanner;
 public class Menu {
   ArrayList<String> options;
   int numOptions;
+  int exitOption;
   Scanner stdin;
 
   public Menu(Scanner s, String... options) {
     this.options = new ArrayList<>(Arrays.asList(options));
     this.numOptions = this.options.size();
+    this.exitOption = this.options.size() - 1;
     this.stdin = s;
   }
 
@@ -72,5 +74,9 @@ public class Menu {
       error = true;
     } while (!(choice >= 1 && choice <= numOptions));
     return choice - 1;
+  }
+
+  public int exitMenuOption() {
+    return this.exitOption;
   }
 }

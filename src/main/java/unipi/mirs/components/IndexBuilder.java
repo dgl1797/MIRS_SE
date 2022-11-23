@@ -30,7 +30,7 @@ public class IndexBuilder {
   /*opened once for the entire building process*/ private BufferedWriter doctable;
   /*resettable*/ private int currentDocID = 0;
   /*unresettable*/ private int currentChunkID = 0;
-  private static final int CHUNKSIZE = 1_000;
+  private static final int CHUNKSIZE = 524_288; // 2^19
 
   // int[0] is the docid, int[1] the term frequency in the docid
   /*resettable*/ private TreeMap<String, ArrayList<int[]>> chunk;
@@ -243,6 +243,8 @@ public class IndexBuilder {
    * @throws IOException
    */
   private void rename(Path p1, Path p2) throws IOException {
+    if (p1.equals(p2))
+      return;
     File f1 = new File(p1.toString());
     if (!f1.exists())
       throw new IOException("Impossible rename operation: " + f1.toString() + " doesn't exist");
@@ -434,6 +436,7 @@ public class IndexBuilder {
       if (debugmode || debugWriter != null)
         debugWriter.close();
 
+      // TODO: fix the rename that sometimes doesn't work on big files
       // delete old files, rename tmp file into _newindex
       //  CLEANING INDEX FILES
       iiFiles[0].delete();
