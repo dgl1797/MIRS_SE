@@ -30,7 +30,6 @@ public class SearchEngine {
      * @throws IOException
      */
     private static void changeInputFile() throws IOException {
-        // while inserted file not found keep saying: "Error ${filename} not in input folder"
         File inputDir = new File(Constants.INPUT_DIR.toString());
 
         String[] files = Arrays.asList(inputDir.listFiles()).stream().filter((f) -> f.isFile())
@@ -49,27 +48,16 @@ public class SearchEngine {
             readCompressed = true;
     }
 
-    private static int collectionSize() {
-        System.out.println(ConsoleUX.CLS + ConsoleUX.FG_BLUE + ConsoleUX.BOLD
-                + "Counting number of documents in the collection...");
-        try (BufferedReader inReader = Files.newBufferedReader(Path.of(inputFile), StandardCharsets.UTF_8)) {
-            int docCounter = 0;
-            while (inReader.readLine() != null)
-                docCounter += 1;
-            return docCounter;
-        } catch (IOException e) {
-            System.out.println(ConsoleUX.FG_RED + ConsoleUX.BOLD + "Unable to initialize buffer for " + inputFile
-                    + ":\n" + e.getMessage() + ConsoleUX.RESET);
-            ConsoleUX.pause(false, stdin);
-            return -1;
-        }
-    }
-
-    private static void buildIndex(int collectionSize) {
+    /**
+     * Builds the inverted index by first creating the sorted chunks of the collection, then merging them in a
+     * merge-sort-like fashion; it will allow the creation in debug mode which will create debug files containing the
+     * core informations of each chunk of files
+     */
+    private static void buildIndex() {
         if (readCompressed) {
 
         }
-        System.out.println(ConsoleUX.BOLD + ConsoleUX.FG_BLUE + "Processing File..." + ConsoleUX.RESET);
+        System.out.println(ConsoleUX.CLS + ConsoleUX.BOLD + ConsoleUX.FG_BLUE + "Processing File..." + ConsoleUX.RESET);
         try (BufferedReader inreader = Files.newBufferedReader(Path.of(inputFile), StandardCharsets.UTF_8)) {
             String document;
             IndexBuilder vb = new IndexBuilder(stdin);
@@ -82,12 +70,13 @@ public class SearchEngine {
             ConsoleUX.pause(true, stdin);
             System.out.println(ConsoleUX.BOLD + ConsoleUX.FG_BLUE + "Merging Chunks..." + ConsoleUX.RESET);
             int nchunks = vb.getNChunks();
-            boolean wasEven = false;
+            boolean wasEven = true;
             //@formatter:off
-            for (int windowsize = nchunks; windowsize > 0; windowsize = (wasEven ? (windowsize / 2) - 1 : (windowsize / 2))) {
+            for (int windowsize = nchunks; windowsize > 0; windowsize = (int)Math.floor(windowsize/2)) {
+                int limit = wasEven ? windowsize-1 : windowsize;
                 int assignIndex = 0;
-                for (int left = 0; left < nchunks; left += 2) {
-                    int right = Math.min(left + 1, nchunks - 1);
+                for (int left = 0; left <= limit; left += 2) {
+                    int right = Math.min(left + 1, limit);
                     vb.merge(left, right, assignIndex);
                     assignIndex++;
                 }
@@ -102,24 +91,35 @@ public class SearchEngine {
         }
     }
 
+    /**
+     * Completely clean the data/output directory from files
+     */
+    private static void cleanOutput(){
+        File outputfolder = new File(Constants.OUTPUT_DIR.toString());
+        //@formatter:on
+        File[] files = Arrays.asList(outputfolder.listFiles()).stream().filter((f) -> f.isFile()).toArray(File[]::new);
+        for (File f : files) {
+            f.delete();
+        }
+        System.out.println(ConsoleUX.CLS + ConsoleUX.FG_GREEN + ConsoleUX.BOLD + "Cleaning complete.");
+        ConsoleUX.pause(true, stdin);
+    }
+
     public static void main(String[] args) throws IOException {
         // Save index in a file, compressed index in another one to avoid re-building index every time
-        Menu menu = new Menu(stdin, "Change Input File", "Build Index", "Compress Inverted Index", "Search", "Exit");
+        Menu menu = new Menu(stdin, "Change Input File", "Build Index", "Compress Inverted Index", "Clean output",
+                "Exit");
         int opt = 0;
         while ((opt = menu.printMenu(
                 ConsoleUX.FG_BLUE + ConsoleUX.BOLD + "Selected File: " + inputFile + ConsoleUX.RESET)) != 4) {
             if (opt == 0) {
                 changeInputFile();
             } else if (opt == 1) {
-                int collectionSize = collectionSize();
-                if (collectionSize == -1) {
-                    continue;
-                }
-                buildIndex(collectionSize);
+                buildIndex();
             } else if (opt == 2) {
-
+                // Compression of the inverted index
             } else if (opt == 3) {
-
+                cleanOutput();
             }
         }
         System.out.println(ConsoleUX.CLS + ConsoleUX.FG_YELLOW + ConsoleUX.BOLD
