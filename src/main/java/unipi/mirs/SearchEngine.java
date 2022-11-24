@@ -84,7 +84,6 @@ public class SearchEngine {
                     int right = Math.min(left + 1, windowsize-1);
                     // merges the next two chunks into chunkid assignindex
                     vb.merge(left, right, assignIndex);
-                    ConsoleUX.pause(true, stdin);
                     // increase the chunkID
                     assignIndex++;
                 }

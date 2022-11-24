@@ -112,8 +112,11 @@ public class IndexBuilder {
     if (currentDocID == CHUNKSIZE) {
       // reset and write of the chunk
       System.out.println(ConsoleUX.FG_BLUE + ConsoleUX.BOLD + "Writing chunk " + currentChunkID + " to file...");
-      System.out.println(ConsoleUX.FG_BLUE + ConsoleUX.BOLD + "Wrote " + currentDocID + " documents to file.");
+      int wroteFiles = currentDocID;
+      int cid = currentChunkID;
       write_chunk();
+      System.out.println(
+          ConsoleUX.FG_BLUE + ConsoleUX.BOLD + "Wrote " + (wroteFiles + cid * CHUNKSIZE) + " documents to file.");
     }
   }
 
@@ -436,21 +439,24 @@ public class IndexBuilder {
       if (debugmode || debugWriter != null)
         debugWriter.close();
 
-      // TODO: fix the rename that sometimes doesn't work on big files
       // delete old files, rename tmp file into _newindex
       //  CLEANING INDEX FILES
       iiFiles[0].delete();
       iiFiles[1].delete();
-      iiFiles[2].renameTo(getNewFileName("inverted_index", newindex));
       //  CLEANING LEXICON FILES
       lsFiles[0].delete();
       lsFiles[1].delete();
-      lsFiles[2].renameTo(getNewFileName("lexicon", newindex));
       //  CLEANING DEBUG FILES
       if (debugmode) {
         dbgFiles[0].delete();
         dbgFiles[1].delete();
-        dbgFiles[2].renameTo(getNewFileName("debug", newindex));
+      }
+
+      // RENAIMING OF THE FILES TO AVOID ISSUES WITH DELETE IT HAS BEEN SEPARATED FROM THE CLEANING STEPS
+      while (!iiFiles[2].renameTo(getNewFileName("inverted_index", newindex)));
+      while (!lsFiles[2].renameTo(getNewFileName("lexicon", newindex)));
+      if (debugmode) {
+        while (!dbgFiles[2].renameTo(getNewFileName("debug", newindex)));
       }
     }
   }
