@@ -1,23 +1,20 @@
-package unipi.mirs.components;
+/*package unipi.mirs.components;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.IntBuffer;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import unipi.mirs.utilities.Constants;
 
-public class PostingList {
-
+public class CompressedPostingList {
+    
     String term;
-    IntBuffer postingList = null;
+    byte postingList = null;
     byte[] currentPosting;
     int pointer = 0;
-    boolean compressed;
-    public PostingList(String term,boolean compress){
+    public CompressedPostingList(String term){
         this.term=term;
-        this.compressed = compress;
     }
 
     public String getTerm()
@@ -181,3 +178,4 @@ public class PostingList {
         return 0;
     }
 }
+*/
