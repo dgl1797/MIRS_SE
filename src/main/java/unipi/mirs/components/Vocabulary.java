@@ -22,8 +22,7 @@ public class Vocabulary {
   }
 
   public void loadVocabulary() throws IOException {
-    // TODO: replace with lexicon.dat after renaming task
-    Path vocabularyPath = Paths.get(Constants.OUTPUT_DIR.toString(), "lexicon_0.dat");
+    Path vocabularyPath = Paths.get(Constants.OUTPUT_DIR.toString(), "lexicon.dat");
     File vocabularyFile = new File(vocabularyPath.toString());
     if (!vocabularyFile.exists()) {
       throw new IOException("Unable to retrieve the vocabulary from the index's file system");

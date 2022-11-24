@@ -54,8 +54,7 @@ public class PostingList {
 
   public boolean openList(int startPosition, int plLength) throws IOException {
     byte[] pl = new byte[plLength];
-    // TODO: replace with inverted_index.dat after renaming task
-    String invertedIndexStr = String.format("inverted_index_0.dat");
+    String invertedIndexStr = String.format("inverted_index.dat");
     Path invertedIndexPath = Paths.get(Constants.OUTPUT_DIR.toString(), invertedIndexStr);
     try {
 

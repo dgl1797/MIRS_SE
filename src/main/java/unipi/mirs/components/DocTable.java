@@ -18,8 +18,7 @@ public class DocTable {
   public DocTable() {}
 
   private Object[] getComponents(String line) {
-    // TODO: replace with "-" instead of " "
-    String[] parts = line.split(" ");
+    String[] parts = line.split("-");
     return new Object[] { parts[0], Integer.parseInt(parts[1]) };
   }
 
