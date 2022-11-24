@@ -15,11 +15,16 @@ public final class TextNormalizationFunctions {
 
   public static final PorterStemmer ps = new PorterStemmer();
 
-  static public String cleanText(String txt) {
-    return txt.toLowerCase().replaceAll("[^\\p{L}\\s]+", " ").replaceAll("\\s+", " ").trim();
+  public static String cleanText(String txt) {
+    //@formatter:off
+    return txt.toLowerCase().replaceAll("[^\\p{L}\\s]+", " ")
+        .replaceAll("ã â â", " ")
+        .replaceAll("â", "")
+        .replaceAll("[\\s]+", " ").trim();
+    //@formatter:on
   }
 
-  static public HashSet<String> load_stopwords() throws IOException {
+  public static HashSet<String> load_stopwords() throws IOException {
     HashSet<String> stopwords = new HashSet<>();
     Path swPath = Paths.get(Constants.INPUT_DIR.toString(), "stopwords.txt");
     try (BufferedReader infile = Files.newBufferedReader(swPath, StandardCharsets.UTF_8)) {

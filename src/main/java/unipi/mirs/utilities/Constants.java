@@ -3,7 +3,7 @@ package unipi.mirs.utilities;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
-public class Constants {
+public final class Constants {
   private Constants() {};
 
   static public Path WORKING_DIR = Paths.get(System.getProperty("user.dir"), "src", "main", "java", "unipi", "mirs");
