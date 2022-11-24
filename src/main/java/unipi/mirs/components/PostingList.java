@@ -9,12 +9,16 @@ import unipi.mirs.utilities.Constants;
 
 public class PostingList {
 
+    String term;
     byte[] postingList;
     byte[] currentPosting;
     int pointer = 0;
-    public PostingList(){};
+    public PostingList(String term){this.term=term;};
 
-
+    public String getTerm()
+    {
+        return this.term;
+    }
     public int getPointer()
     {
         return this.pointer;
