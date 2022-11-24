@@ -10,14 +10,12 @@ import unipi.mirs.utilities.Constants;
 
 public class PostingList {
 
+    private final int postingSize = 2;
     String term;
     IntBuffer postingList = null;
-    byte[] currentPosting;
-    int pointer = 0;
-    boolean compressed;
-    public PostingList(String term,boolean compress){
+
+    public PostingList(String term){
         this.term=term;
-        this.compressed = compress;
     }
 
     public String getTerm()
@@ -26,34 +24,32 @@ public class PostingList {
     }
     public int getPointer()
     {
-        return this.pointer;
+        return this.postingList.position();
     }
     public int getDocID()
     {
-        return postingToInt(currentPosting)[0];
+        return this.postingList.get(this.postingList.position());
     }
     public int getFreq()
     {
-        return postingToInt(currentPosting)[1];
+        return this.postingList.get(this.postingList.position()+1);
     }
     public boolean next()
     {
         try {
             
-        this.postingList.position(this.postingList.position()+1);//Arrays.copyOfRange(this.postingList, this.pointer, this.pointer + (Integer.BYTES*2));
-        this.pointer += Integer.BYTES*2;
-        this.currentPosting=posting;
+        this.postingList.position(this.postingList.position()+postingSize);//Arrays.copyOfRange(this.postingList, this.pointer, this.pointer + (Integer.BYTES*2));
         return true;
         } catch (IndexOutOfBoundsException e) {
             System.out.println("Error during next() function, array out of bound: " + e.getMessage());
         }
         return false;
     }
+
     public void close()
     {
         this.postingList = null;
-        this.currentPosting = null;
-        this.pointer = 0;
+        this.term = null;
     }
 
 
@@ -66,11 +62,11 @@ public class PostingList {
         FileInputStream fileInvInd = new FileInputStream(invertedIndexPath.toString());
         fileInvInd.read(pl, startPosition, plLength);
 
-        if(this.compressed)
-        {
-            this.postingList= ByteBuffer.wrap(pl);   
-        
-        }
+       
+        this.postingList= ByteBuffer.wrap(pl).asIntBuffer();   
+        //garbage collector, dovrebbe?
+        invertedIndexPath=null;
+        invertedIndexStr=null;
         } catch (IOException e) {
             System.out.println("OpenList function error, cannot open file "+invertedIndexPath.toString()+"\n"+e.getMessage());
         }
@@ -78,99 +74,56 @@ public class PostingList {
         return true;
     }
 
-    public Integer[] postingToInt(byte[] pl) {
-        
-        Integer iterator = 0;
-        Integer[] posting ;
-        try {
-            ByteBuffer wrapped = ByteBuffer.wrap(Arrays.copyOfRange(pl, iterator, iterator + Integer.BYTES));
-            int docid = wrapped.getInt();
-            iterator += Integer.BYTES;
-    
-            wrapped = ByteBuffer.wrap(Arrays.copyOfRange(pl, iterator, iterator + Integer.BYTES));
-            int tf = wrapped.getInt();
-    
-            posting = new Integer[]{ docid, tf };
-            return posting;
-    
-        } catch (Exception e) {
-            System.out.println("Error during postingToInt function parsing " + e.getMessage());
-        }
-        return null;
 
-        
-    }
 
     public boolean nextGEQ(int docid){
         
-        int postListByteSize = 2*Integer.BYTES;
-        int currdocid = getDocID();
-        if( currdocid>=docid)
+        if(this.postingList.get(this.postingList.position()) >= docid)
         {
             return true;
         }
-        byte[] checkPost = Arrays.copyOfRange(this.postingList, this.pointer, this.pointer + (postListByteSize));
-        if(postingToInt(checkPost)[0]>=docid)
+
+        if(this.postingList.get(this.postingList.position()+postingSize) >= docid)
         {
-            this.currentPosting = checkPost;
-            this.pointer+=1;
+            this.postingList.position(this.postingList.position()+postingSize);
             return true;
         }
+
+
+
+        int rightPosition =  this.postingList.capacity();
+
         
-
-        int leftPostings = this.pointer+1;
-        int rightPostings = (this.postingList.length /(postListByteSize));
-
-        checkPost = Arrays.copyOfRange(this.postingList, rightPostings*(postListByteSize)-(postListByteSize), rightPostings*(postListByteSize));
-
-        if( postingToInt(checkPost)[0]<docid)
+        if(this.postingList.get(rightPosition-1) < docid)
         {
             return false;
         }
-        if( postingToInt(checkPost)[0]==docid)
+        int leftPosition = this.postingList.position()+postingSize;
+        int middlePosition = (int) Math.floor((leftPosition+rightPosition)/2);
+
+
+        while(this.postingList.get(middlePosition)!=docid)
         {
-            this.currentPosting = checkPost;
-            this.pointer=rightPostings*(postListByteSize)-(postListByteSize);
-            return true;
-        }
-
-        int middlePosting = (int) Math.floor((rightPostings+leftPostings)/2);
-
-        checkPost= Arrays.copyOfRange(this.postingList, middlePosting*2, middlePosting*2 + (postListByteSize));
-
-
-
-        while(postingToInt(checkPost)[0] == docid)
-        {
-            int middleDocid = postingToInt(Arrays.copyOfRange(this.postingList, middlePosting*2, middlePosting*2 + (postListByteSize)))[0];
-            //int rightDocid =
-            //int leftDocid =  
-            if((rightPostings-leftPostings)==1)
+            if((rightPosition-leftPosition)==1)
             {
-                this.currentPosting = Arrays.copyOfRange(this.postingList, rightPostings*(postListByteSize)-(postListByteSize), rightPostings*(postListByteSize));
-                this.pointer=rightPostings*(postListByteSize)-(postListByteSize);
+                this.postingList.position(rightPosition);
                 return true;
             }
-            if(docid<middleDocid)
+
+            int midVal =  this.postingList.get(middlePosition);
+            if(docid>midVal)
             {
-                rightPostings = middlePosting;
-
+                leftPosition= middlePosition;
             }
-
-
-            if(docid>middleDocid)
+            else
             {
-                leftPostings = middlePosting;
-
+                rightPosition= middlePosition;
             }
-            middlePosting = (int) Math.floor((rightPostings+leftPostings)/2);
-
+            middlePosition =(int) Math.floor((leftPosition+rightPosition)/2);
         }
 
 
-
-
-
+        this.postingList.position(middlePosition);
         return true;
     }
 

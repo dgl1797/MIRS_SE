@@ -174,7 +174,7 @@ public class CompressedPostingList {
     public double score()
     {
 
-        //return score += (1+Math.log(this.getFreq()))*Math.log(Constants.TOTDOCS/DOCFREQ_DA_PRENDERE_DA_MAPDB);
+        //return score += (1+Math.log(this.getFreq()))*Math.log(Constants.TOTDOCS/plLength);
         return 0;
     }
 }
