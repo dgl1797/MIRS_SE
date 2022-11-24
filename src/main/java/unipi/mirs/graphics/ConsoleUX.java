@@ -30,6 +30,31 @@ public final class ConsoleUX {
   public static final String BG_CYAN = "\u001B[46m";
   public static final String BG_WHITE = "\u001B[47m";
 
+  // MACROS
+  public static final void DebugLog(String log) {
+    System.out.println(ConsoleUX.RESET + ConsoleUX.FG_BLUE + ConsoleUX.BOLD + log + ConsoleUX.RESET);
+  }
+
+  public static final void DebugLog(String log, String termination) {
+    System.out.print(ConsoleUX.RESET + ConsoleUX.FG_BLUE + ConsoleUX.BOLD + log + ConsoleUX.RESET + termination);
+  }
+
+  public static final void SuccessLog(String log) {
+    System.out.println(ConsoleUX.RESET + ConsoleUX.FG_GREEN + ConsoleUX.BOLD + log + ConsoleUX.RESET);
+  }
+
+  public static final void SuccessLog(String log, String termination) {
+    System.out.print(ConsoleUX.RESET + ConsoleUX.FG_GREEN + ConsoleUX.BOLD + log + ConsoleUX.RESET + termination);
+  }
+
+  public static final void ErrorLog(String log) {
+    System.out.println(ConsoleUX.RESET + ConsoleUX.FG_RED + ConsoleUX.BOLD + log + ConsoleUX.RESET);
+  }
+
+  public static final void ErrorLog(String log, String termination) {
+    System.out.print(ConsoleUX.RESET + ConsoleUX.FG_RED + ConsoleUX.BOLD + log + ConsoleUX.RESET + termination);
+  }
+
   /**
    * Pauses the execution of the program until Enter key is pressed.
    * 

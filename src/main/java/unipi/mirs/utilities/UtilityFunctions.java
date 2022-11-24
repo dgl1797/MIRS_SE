@@ -13,7 +13,7 @@ public final class UtilityFunctions {
    * @param nInts the number of integers contained in the bytes array b
    * @return the integers representation of the byte array b
    */
-  public int[] BytesToInts(byte[] b, int nInts) {
+  public static int[] BytesToInts(byte[] b, int nInts) {
     int[] ints = new int[nInts];
     for (int i = 0; i < nInts; i++) {
       ints[i] = ByteBuffer.wrap(b, i * Integer.BYTES, Integer.BYTES).getInt();
@@ -29,7 +29,7 @@ public final class UtilityFunctions {
    * @param plLength the length of the posting list
    * @return the ArrayList<Integer[]> representation of the posting list
    */
-  public ArrayList<Integer[]> binaryPLtoIntegerArray(byte[] b, int plLength) {
+  public static ArrayList<Integer[]> binaryPLtoIntegerArray(byte[] b, int plLength) {
     ArrayList<Integer[]> list = new ArrayList<>();
     for (int i = 0; i < plLength * 2; i += 2) {
       int docid = ByteBuffer.wrap(b, i * Integer.BYTES, Integer.BYTES).getInt();
@@ -45,7 +45,7 @@ public final class UtilityFunctions {
    * @param i the integers array to be serialized
    * @return the serialized byte[] array of the integers array
    */
-  public byte[] IntsToBytes(int[] i) {
+  public static byte[] IntsToBytes(int[] i) {
     ByteBuffer bb = ByteBuffer.allocate(i.length * Integer.BYTES);
     for (int j = 0; j < i.length; j++) {
       bb = bb.putInt(i[j]);

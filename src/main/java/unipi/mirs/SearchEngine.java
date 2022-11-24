@@ -30,7 +30,6 @@ public class SearchEngine {
      * @throws IOException
      */
     private static void changeInputFile() throws IOException {
-        // while inserted file not found keep saying: "Error ${filename} not in input folder"
         File inputDir = new File(Constants.INPUT_DIR.toString());
 
         String[] files = Arrays.asList(inputDir.listFiles()).stream().filter((f) -> f.isFile())
@@ -38,9 +37,8 @@ public class SearchEngine {
                 .map(f -> f.toString()).toArray(String[]::new);
 
         if (Arrays.asList(files).size() == 0) {
-            System.out.println(
-                    ConsoleUX.FG_RED + ConsoleUX.BOLD + "No files found, make sure to import a .tsv or .gz file inside "
-                            + Constants.INPUT_DIR + " folder" + ConsoleUX.RESET);
+            ConsoleUX.ErrorLog(
+                    "No files found, make sure to import a .tsv or .gz file inside " + Constants.INPUT_DIR + " folder");
             inputFile = "";
         }
         Menu filesMenu = new Menu(stdin, files);
@@ -49,27 +47,16 @@ public class SearchEngine {
             readCompressed = true;
     }
 
-    private static int collectionSize() {
-        System.out.println(ConsoleUX.CLS + ConsoleUX.FG_BLUE + ConsoleUX.BOLD
-                + "Counting number of documents in the collection...");
-        try (BufferedReader inReader = Files.newBufferedReader(Path.of(inputFile), StandardCharsets.UTF_8)) {
-            int docCounter = 0;
-            while (inReader.readLine() != null)
-                docCounter += 1;
-            return docCounter;
-        } catch (IOException e) {
-            System.out.println(ConsoleUX.FG_RED + ConsoleUX.BOLD + "Unable to initialize buffer for " + inputFile
-                    + ":\n" + e.getMessage() + ConsoleUX.RESET);
-            ConsoleUX.pause(false, stdin);
-            return -1;
-        }
-    }
-
-    private static void buildIndex(int collectionSize) {
+    /**
+     * Builds the inverted index by first creating the sorted chunks of the collection, then merging them in a
+     * merge-sort-like fashion; it will allow the creation in debug mode which will create debug files containing the
+     * core informations of each chunk of files
+     */
+    private static void buildIndex() {
         if (readCompressed) {
 
         }
-        System.out.println(ConsoleUX.BOLD + ConsoleUX.FG_BLUE + "Processing File..." + ConsoleUX.RESET);
+        ConsoleUX.DebugLog(ConsoleUX.CLS + "Processing File...");
         try (BufferedReader inreader = Files.newBufferedReader(Path.of(inputFile), StandardCharsets.UTF_8)) {
             String document;
             IndexBuilder vb = new IndexBuilder(stdin);
@@ -78,48 +65,67 @@ public class SearchEngine {
             }
             vb.write_chunk();
             vb.closeDocTable();
-            System.out.println(ConsoleUX.FG_GREEN + ConsoleUX.BOLD + "Index Builded succesfully.");
+            ConsoleUX.SuccessLog("Index Builded succesfully.");
             ConsoleUX.pause(true, stdin);
-            System.out.println(ConsoleUX.BOLD + ConsoleUX.FG_BLUE + "Merging Chunks..." + ConsoleUX.RESET);
             int nchunks = vb.getNChunks();
-            boolean wasEven = false;
+            ConsoleUX.DebugLog("Merging " + nchunks + " Chunks...");
+            boolean remainingChunk = false;
             //@formatter:off
-            for (int windowsize = nchunks; windowsize > 0; windowsize = (wasEven ? (windowsize / 2) - 1 : (windowsize / 2))) {
+            for (int windowsize = nchunks; windowsize > 0; windowsize = (int)Math.floor(windowsize/2)) {
+                // reset the chunkID to 0
                 int assignIndex = 0;
-                for (int left = 0; left < nchunks; left += 2) {
-                    int right = Math.min(left + 1, nchunks - 1);
+                // windowsize will be the previous windowsize/2 + the eventual odd chunk if windowsize was odd
+                windowsize = remainingChunk ? windowsize+1 : windowsize;
+                if(windowsize == 1) break; // we have a single chunk which means we don't need to merge anymore
+                for (int left = 0; left < windowsize; left += 2) {
+                    // if left == right we will just rename the chunk and bring it to the next merge iteration
+                    int right = Math.min(left + 1, windowsize-1);
+                    // merges the next two chunks into chunkid assignindex
                     vb.merge(left, right, assignIndex);
+                    // increase the chunkID
                     assignIndex++;
                 }
-                wasEven = (windowsize % 2 == 0);
+                // calculating if there was a remaining chunk that we need to consider in the next iteration
+                remainingChunk = ((windowsize%2) != 0);
             }
-            System.out.println(ConsoleUX.BOLD + ConsoleUX.FG_GREEN + "Merged " + nchunks + " Chunks" + ConsoleUX.RESET);
+            ConsoleUX.SuccessLog("Merged " + nchunks + " Chunks");
             ConsoleUX.pause(true, stdin);
         } catch (IOException e) {
-            System.out.println(ConsoleUX.FG_RED + ConsoleUX.BOLD + "Unable to create index for " + inputFile + ":\n"
-                    + e.getMessage() + ConsoleUX.RESET);
+            ConsoleUX.ErrorLog("Unable to create index for " + inputFile + ":\n" + e.getMessage());
             ConsoleUX.pause(false, stdin);
         }
     }
 
+    /**
+     * Completely clean the data/output directory from files
+     */
+    private static void cleanOutput(){
+        File outputfolder = new File(Constants.OUTPUT_DIR.toString());
+        //@formatter:on
+        File[] files = Arrays.asList(outputfolder.listFiles()).stream().filter((f) -> f.isFile()).toArray(File[]::new);
+        for (File f : files) {
+            f.delete();
+        }
+        ConsoleUX.SuccessLog("Cleaning complete.");
+        ConsoleUX.pause(true, stdin);
+    }
+
     public static void main(String[] args) throws IOException {
         // Save index in a file, compressed index in another one to avoid re-building index every time
-        Menu menu = new Menu(stdin, "Change Input File", "Build Index", "Compress Inverted Index", "Search", "Exit");
+        Menu menu = new Menu(stdin, "Change Input File", "Build Index", "Compress Inverted Index", "Clean output",
+                "Exit");
         int opt = 0;
         while ((opt = menu.printMenu(
-                ConsoleUX.FG_BLUE + ConsoleUX.BOLD + "Selected File: " + inputFile + ConsoleUX.RESET)) != 4) {
+                ConsoleUX.FG_BLUE + ConsoleUX.BOLD + "Selected File: " + inputFile + ConsoleUX.RESET)) != menu
+                        .exitMenuOption()) {
             if (opt == 0) {
                 changeInputFile();
             } else if (opt == 1) {
-                int collectionSize = collectionSize();
-                if (collectionSize == -1) {
-                    continue;
-                }
-                buildIndex(collectionSize);
+                buildIndex();
             } else if (opt == 2) {
-
+                // Compression of the inverted index
             } else if (opt == 3) {
-
+                cleanOutput();
             }
         }
         System.out.println(ConsoleUX.CLS + ConsoleUX.FG_YELLOW + ConsoleUX.BOLD
