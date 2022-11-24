@@ -54,7 +54,7 @@ public class IndexBuilder {
     // detection of another instance of index, request for overwrite mode
     File dtf = new File(Paths.get(Constants.OUTPUT_DIR.toString(), "doctable_test.dat").toString());
     if (dtf.exists()) {
-      System.out.print(ConsoleUX.FG_RED + ConsoleUX.BOLD + "Index already present, opearte in overwite mode? [Y/n]: ");
+      ConsoleUX.ErrorLog("Index already present, opearte in overwite mode? [Y/n]: ", "");
       String choice = this.stdin.nextLine().toLowerCase();
       if (choice.equals("n"))
         throw new IOException("operation cancelled by the user");
@@ -63,7 +63,7 @@ public class IndexBuilder {
       }
     }
     // request for debugmode activation which creates debug files for each inverted index's chunk
-    System.out.print(ConsoleUX.FG_BLUE + ConsoleUX.BOLD + "Do you want to create debug files? [Y/n]: ");
+    ConsoleUX.DebugLog("Do you want to create debug files? [Y/n]: ", "");
     String choice = this.stdin.nextLine().toLowerCase();
     if (!choice.equals("n")) {
       this.debugmode = true;
@@ -111,12 +111,11 @@ public class IndexBuilder {
     currentDocID++;
     if (currentDocID == CHUNKSIZE) {
       // reset and write of the chunk
-      System.out.println(ConsoleUX.FG_BLUE + ConsoleUX.BOLD + "Writing chunk " + currentChunkID + " to file...");
+      ConsoleUX.DebugLog("Writing chunk " + currentChunkID + " to file...");
       int wroteFiles = currentDocID;
       int cid = currentChunkID;
       write_chunk();
-      System.out.println(
-          ConsoleUX.FG_BLUE + ConsoleUX.BOLD + "Wrote " + (wroteFiles + cid * CHUNKSIZE) + " documents to file.");
+      ConsoleUX.DebugLog("Wrote " + (wroteFiles + cid * CHUNKSIZE) + " documents to file.");
     }
   }
 
@@ -343,7 +342,7 @@ public class IndexBuilder {
   public void merge(int li, int ri, int newindex) throws IOException {
     if (li == ri) {
       // just rename the three needed files into *.newindex
-      System.out.println(ConsoleUX.FG_BLUE + ConsoleUX.BOLD + "Renaming chunks _" + li + " to _" + newindex);
+      ConsoleUX.DebugLog("Renaming chunks _" + li + " to _" + newindex);
       Path oldPath = Paths.get(Constants.OUTPUT_DIR.toString(), String.format("inverted_index_%d.dat", li));
       Path newPath = Paths.get(Constants.OUTPUT_DIR.toString(), String.format("inverted_index_%d.dat", newindex));
       rename(oldPath, newPath);
@@ -356,8 +355,7 @@ public class IndexBuilder {
       newPath = Paths.get(Constants.OUTPUT_DIR.toString(), String.format("lexicon_%d.dat", newindex));
       rename(oldPath, newPath);
     } else {
-      System.out
-          .println(ConsoleUX.FG_BLUE + ConsoleUX.BOLD + "Merging chunks _" + li + " and _" + ri + " into _" + newindex);
+      ConsoleUX.DebugLog("Merging chunks _" + li + " and _" + ri + " into _" + newindex);
       // [0] is left, [1] is right, [2] is tmp
       File[] iiFiles = getFiles("inverted_index", li, ri);
       File[] dbgFiles = debugmode ? getFiles("debug", li, ri) : null;

@@ -30,11 +30,10 @@ public class Menu {
     do {
       System.out.print(ConsoleUX.CLS);
       for (int i = 0; i < numOptions; i++) {
-        System.out.println(ConsoleUX.FG_GREEN + ConsoleUX.BOLD + " " + (i + 1) + " > " + options.get(i));
+        ConsoleUX.SuccessLog(" " + (i + 1) + " > " + options.get(i));
       }
-      System.out.print(ConsoleUX.RESET);
       if (error) {
-        System.out.println(ConsoleUX.FG_RED + ConsoleUX.BOLD + "Invalid Choice" + ConsoleUX.RESET);
+        ConsoleUX.ErrorLog("Invalid Choice");
       }
       String tmp = stdin.nextLine();
       try {
@@ -53,18 +52,17 @@ public class Menu {
    * @return the selected choice
    * @throws IOException
    */
-  public int printMenu(String extraPrint) throws IOException {
+  public int printMenu(String title) throws IOException {
     int choice = 0;
     boolean error = false;
     do {
       System.out.print(ConsoleUX.CLS);
-      System.out.println(extraPrint);
+      System.out.println(title);
       for (int i = 0; i < numOptions; i++) {
-        System.out.println(ConsoleUX.FG_GREEN + ConsoleUX.BOLD + " " + (i + 1) + " > " + options.get(i));
+        ConsoleUX.SuccessLog(" " + (i + 1) + " > " + options.get(i));
       }
-      System.out.print(ConsoleUX.RESET);
       if (error) {
-        System.out.println(ConsoleUX.FG_RED + ConsoleUX.BOLD + "Invalid Choice" + ConsoleUX.RESET);
+        ConsoleUX.ErrorLog("Invalid Choice");
       }
       String tmp = stdin.nextLine();
       try {

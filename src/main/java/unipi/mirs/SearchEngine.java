@@ -37,9 +37,8 @@ public class SearchEngine {
                 .map(f -> f.toString()).toArray(String[]::new);
 
         if (Arrays.asList(files).size() == 0) {
-            System.out.println(
-                    ConsoleUX.FG_RED + ConsoleUX.BOLD + "No files found, make sure to import a .tsv or .gz file inside "
-                            + Constants.INPUT_DIR + " folder" + ConsoleUX.RESET);
+            ConsoleUX.ErrorLog(
+                    "No files found, make sure to import a .tsv or .gz file inside " + Constants.INPUT_DIR + " folder");
             inputFile = "";
         }
         Menu filesMenu = new Menu(stdin, files);
@@ -57,7 +56,7 @@ public class SearchEngine {
         if (readCompressed) {
 
         }
-        System.out.println(ConsoleUX.CLS + ConsoleUX.BOLD + ConsoleUX.FG_BLUE + "Processing File..." + ConsoleUX.RESET);
+        ConsoleUX.DebugLog(ConsoleUX.CLS + "Processing File...");
         try (BufferedReader inreader = Files.newBufferedReader(Path.of(inputFile), StandardCharsets.UTF_8)) {
             String document;
             IndexBuilder vb = new IndexBuilder(stdin);
@@ -66,11 +65,10 @@ public class SearchEngine {
             }
             vb.write_chunk();
             vb.closeDocTable();
-            System.out.println(ConsoleUX.FG_GREEN + ConsoleUX.BOLD + "Index Builded succesfully.");
+            ConsoleUX.SuccessLog("Index Builded succesfully.");
             ConsoleUX.pause(true, stdin);
             int nchunks = vb.getNChunks();
-            System.out.println(
-                    ConsoleUX.BOLD + ConsoleUX.FG_BLUE + "Merging " + nchunks + " Chunks..." + ConsoleUX.RESET);
+            ConsoleUX.DebugLog("Merging " + nchunks + " Chunks...");
             boolean remainingChunk = false;
             //@formatter:off
             for (int windowsize = nchunks; windowsize > 0; windowsize = (int)Math.floor(windowsize/2)) {
@@ -90,11 +88,10 @@ public class SearchEngine {
                 // calculating if there was a remaining chunk that we need to consider in the next iteration
                 remainingChunk = ((windowsize%2) != 0);
             }
-            System.out.println(ConsoleUX.BOLD + ConsoleUX.FG_GREEN + "Merged " + nchunks + " Chunks" + ConsoleUX.RESET);
+            ConsoleUX.SuccessLog("Merged " + nchunks + " Chunks");
             ConsoleUX.pause(true, stdin);
         } catch (IOException e) {
-            System.out.println(ConsoleUX.FG_RED + ConsoleUX.BOLD + "Unable to create index for " + inputFile + ":\n"
-                    + e.getMessage() + ConsoleUX.RESET);
+            ConsoleUX.ErrorLog("Unable to create index for " + inputFile + ":\n" + e.getMessage());
             ConsoleUX.pause(false, stdin);
         }
     }
@@ -109,7 +106,7 @@ public class SearchEngine {
         for (File f : files) {
             f.delete();
         }
-        System.out.println(ConsoleUX.CLS + ConsoleUX.FG_GREEN + ConsoleUX.BOLD + "Cleaning complete.");
+        ConsoleUX.SuccessLog("Cleaning complete.");
         ConsoleUX.pause(true, stdin);
     }
 
