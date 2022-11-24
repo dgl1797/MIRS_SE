@@ -40,11 +40,11 @@ public final class ConsoleUX {
   }
 
   public static final void SuccessLog(String log) {
-    System.out.println(ConsoleUX.RESET + ConsoleUX.FG_RED + ConsoleUX.BOLD + log + ConsoleUX.RESET);
+    System.out.println(ConsoleUX.RESET + ConsoleUX.FG_GREEN + ConsoleUX.BOLD + log + ConsoleUX.RESET);
   }
 
   public static final void SuccessLog(String log, String termination) {
-    System.out.print(ConsoleUX.RESET + ConsoleUX.FG_RED + ConsoleUX.BOLD + log + ConsoleUX.RESET + termination);
+    System.out.print(ConsoleUX.RESET + ConsoleUX.FG_GREEN + ConsoleUX.BOLD + log + ConsoleUX.RESET + termination);
   }
 
   public static final void ErrorLog(String log) {
