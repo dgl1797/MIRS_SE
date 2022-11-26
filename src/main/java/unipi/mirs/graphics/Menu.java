@@ -68,6 +68,10 @@ public class Menu {
       try {
         choice = Integer.parseInt(tmp);
       } catch (Exception e) {
+        for (int i = 0; i < numOptions; i++) {
+          if (tmp.toLowerCase().equals(options.get(i).toLowerCase()))
+            choice = i + 1;
+        }
       }
       error = true;
     } while (!(choice >= 1 && choice <= numOptions));
