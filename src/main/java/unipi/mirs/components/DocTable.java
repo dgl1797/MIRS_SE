@@ -12,6 +12,7 @@ import java.util.HashMap;
 import unipi.mirs.utilities.Constants;
 
 public class DocTable {
+  //[0] is the docno , [1] the doclen
   public HashMap<Integer, Object[]> doctable = new HashMap<>();
   public int ndocs = 0;
 

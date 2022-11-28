@@ -13,16 +13,9 @@ import unipi.mirs.utilities.Constants;
 public class PostingList {
 
   private final int postingSize = 2;
-  String term;
   IntBuffer postingList = null;
 
-  public PostingList(String term) {
-    this.term = term;
-  }
-
-  public String getTerm() {
-    return this.term;
-  }
+  private PostingList() {}
 
   public int getPointer() {
     return this.postingList.position();
@@ -49,28 +42,29 @@ public class PostingList {
 
   public void close() {
     this.postingList = null;
-    this.term = null;
   }
 
-  public boolean openList(int startPosition, int plLength) throws IOException {
+  public static PostingList openList(int startPosition, int plLength) throws IOException {
+    PostingList postinglist = null;
     byte[] pl = new byte[plLength];
     String invertedIndexStr = String.format("inverted_index.dat");
     Path invertedIndexPath = Paths.get(Constants.OUTPUT_DIR.toString(), invertedIndexStr);
-    try {
+    try (FileInputStream fileInvInd = new FileInputStream(invertedIndexPath.toString())) {
 
-      FileInputStream fileInvInd = new FileInputStream(invertedIndexPath.toString());
       fileInvInd.read(pl, startPosition, plLength);
 
-      this.postingList = ByteBuffer.wrap(pl).asIntBuffer();
+      postinglist = new PostingList();
+      postinglist.postingList = ByteBuffer.wrap(pl).asIntBuffer();
+
       //garbage collector, dovrebbe?
       invertedIndexPath = null;
       invertedIndexStr = null;
+      return postinglist;
     } catch (IOException e) {
       ConsoleUX.ErrorLog(
           "OpenList function error, cannot open file " + invertedIndexPath.toString() + "\n" + e.getMessage());
+      return null;
     }
-
-    return true;
   }
 
   public boolean nextGEQ(int docid) {

@@ -14,6 +14,7 @@ import unipi.mirs.utilities.Constants;
 public class Vocabulary {
   public HashMap<String, int[]> vocabulary = new HashMap<String, int[]>();
 
+  //the cell [0] is the docid , into the cell [1] there is the length
   public Vocabulary() {}
 
   private int[] getComponents(String line) {
