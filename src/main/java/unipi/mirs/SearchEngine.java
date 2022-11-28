@@ -123,7 +123,6 @@ public class SearchEngine {
         top20.pollLast();
       }
       top20.add(new AbstractMap.SimpleEntry<String, Double>((String) doctable.doctable.get(maxDocId)[0], total));
-
     }
     return (String[]) top20.toArray();
   }
