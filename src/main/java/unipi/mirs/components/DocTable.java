@@ -15,6 +15,7 @@ public class DocTable {
   //[0] is the docno , [1] the doclen
   public HashMap<Integer, Object[]> doctable = new HashMap<>();
   public int ndocs = 0;
+  public double avgDocLen = 0;
 
   public DocTable() {}
 
@@ -35,11 +36,13 @@ public class DocTable {
       this.ndocs += 1;
       String[] parts = line.split("\t");
       int docid = Integer.parseInt(parts[0]);
+      avgDocLen += Integer.parseInt(parts[1].split("-")[1]);
       if (doctable.containsKey(docid)) {
         throw new IOException("Malformed Document table");
       }
       doctable.put(docid, getComponents(parts[1]));
     }
+    avgDocLen /= ndocs;
   }
 
 }

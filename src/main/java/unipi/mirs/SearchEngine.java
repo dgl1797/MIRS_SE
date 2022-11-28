@@ -1,19 +1,13 @@
 package unipi.mirs;
 
 import java.io.IOException;
-import java.time.chrono.IsoChronology;
 import java.util.AbstractMap;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Map;
-import java.util.PriorityQueue;
 import java.util.Scanner;
-import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.Map.Entry;
-
-import javax.management.Query;
 
 import unipi.mirs.components.DocTable;
 import unipi.mirs.components.Vocabulary;
@@ -114,7 +108,8 @@ public class SearchEngine {
       }
       double total = 0;
       for (String w : pls.keySet()) {
-        total += ((PostingList) pls.get(w)[0]).score();
+        total += ((PostingList) pls.get(w)[0]).score(doctable.ndocs, ((PostingList) pls.get(w)[0]).totalLength,
+            ((int) pls.get(w)[1]), (int) doctable.doctable.get(maxDocId)[1], doctable.avgDocLen);
       }
       if (top20.size() == 20) {
         if (total < top20.last().getValue()) {
@@ -163,11 +158,10 @@ public class SearchEngine {
           System.out.print(ConsoleUX.CLS);
           continue;
         }
+
         // query start
         long before = System.currentTimeMillis();
-
-        // top20 = search(query);
-
+        top20 = isConjunctive ? search(query) : search(query, true);
         long delta = System.currentTimeMillis() - before;
         // query end
 

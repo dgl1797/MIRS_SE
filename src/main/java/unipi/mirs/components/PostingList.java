@@ -13,7 +13,8 @@ import unipi.mirs.utilities.Constants;
 public class PostingList {
 
   private final int postingSize = 2;
-  IntBuffer postingList = null;
+  private IntBuffer postingList = null;
+  public int totalLength = 0;
 
   private PostingList() {}
 
@@ -55,6 +56,7 @@ public class PostingList {
 
       postinglist = new PostingList();
       postinglist.postingList = ByteBuffer.wrap(pl).asIntBuffer();
+      postinglist.totalLength = plLength;
 
       //garbage collector, dovrebbe?
       invertedIndexPath = null;
@@ -105,9 +107,9 @@ public class PostingList {
     return true;
   }
 
-  public double score() {
-
-    //return score += (1+Math.log(this.getFreq()))*Math.log(Constants.TOTDOCS/DOCFREQ_DA_PRENDERE_DA_MAPDB);
-    return 0;
+  public double score(int ndocs, int plLength, int noccurrences, int doclen, double avdl) {
+    int tf = getFreq();
+    return noccurrences * ((tf) / (Constants.K_ONE * ((1 - Constants.B) + (Constants.B * doclen / avdl)) + tf)
+        * Math.log10(ndocs / plLength));
   }
 }
