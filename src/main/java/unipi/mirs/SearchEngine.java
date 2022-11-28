@@ -32,15 +32,19 @@ public class SearchEngine {
       return false;
     } else if (command.toLowerCase().equals("exit")) {
       return true;
+    } else if (command.toLowerCase().equals("file")) {
+      ConsoleUX.DebugLog("Work in progress");
     } else if (command.toLowerCase().equals("help")) {
       ConsoleUX.SuccessLog(ConsoleUX.CLS + "/help/ - prints the guide for all possible commands");
       ConsoleUX.SuccessLog("/mode/ - changes query mode(conjunctive - disjunctive)");
+      ConsoleUX.SuccessLog("/file/ - performs queries taking them from a selected file");
       ConsoleUX.SuccessLog("/exit/ - stops the interactive search");
       ConsoleUX.pause(true, stdin);
     } else {
       ConsoleUX.ErrorLog(ConsoleUX.CLS + "Unknown Command:");
       ConsoleUX.SuccessLog("/help/ - prints the guide for all possible commands");
       ConsoleUX.SuccessLog("/mode/ - changes query mode(conjunctive - disjunctive)");
+      ConsoleUX.SuccessLog("/file/ - performs queries taking them from a selected file");
       ConsoleUX.SuccessLog("/exit/ - stops the interactive search");
       ConsoleUX.pause(true, stdin);
     }
@@ -59,6 +63,7 @@ public class SearchEngine {
       String[] top20 = new String[20];
       ConsoleUX.SuccessLog(ConsoleUX.CLS + "Commands:\n/help/ - prints the guide for all possible commands");
       ConsoleUX.SuccessLog("/mode/ - changes query mode(conjunctive - disjunctive)");
+      ConsoleUX.SuccessLog("/file/ - performs queries taking them from a selected file");
       ConsoleUX.SuccessLog("/exit/ - quits the search engine");
       // interactive querying
       while (true) {
@@ -67,7 +72,7 @@ public class SearchEngine {
         ConsoleUX.SuccessLog(": ", "");
         String query = stdin.nextLine();
         // query system commands
-        if (query.matches("^\\/(help|mode|exit)\\/$")) {
+        if (query.matches("^\\/(help|mode|file|exit)\\/$")) {
           if (handleCommand(query.replaceAll("\\/", ""))) {
             // termination if user enters /exit/ in the search field
             break;

@@ -9,4 +9,5 @@ public final class Constants {
   static public Path WORKING_DIR = Paths.get(System.getProperty("user.dir"), "src", "main", "java", "unipi", "mirs");
   static public Path INPUT_DIR = Paths.get(WORKING_DIR.toString(), "data", "input");
   static public Path OUTPUT_DIR = Paths.get(WORKING_DIR.toString(), "data", "output");
+  static public Path QUERIES_FILES = Paths.get(WORKING_DIR.toString(), "data", "input", "queries");
 }
