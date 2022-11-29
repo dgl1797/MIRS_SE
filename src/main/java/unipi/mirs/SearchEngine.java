@@ -15,21 +15,6 @@ import unipi.mirs.graphics.ConsoleUX;
 import unipi.mirs.components.PostingList;
 import unipi.mirs.utilities.TextNormalizationFunctions;
 
-/**
- * @formatter:off
- * search has to give the chance to quit after a succesful query such as:
- *   d1
- *   d2
- *   d3
- *  keep querying? [Y/n]: y
- * 
- * search: <newquery>
- *   d1 -> old results
- *   d2 -> old results
- *   d3 -> old results
- * @formatter:on
- */
-
 public class SearchEngine {
   private static final Scanner stdin = new Scanner(System.in);
   private static boolean isConjunctive = false;
@@ -85,7 +70,7 @@ public class SearchEngine {
           maxDocId = ((PostingList) pls.get(w)[0]).getDocID() > maxDocId ? ((PostingList) pls.get(w)[0]).getDocID()
               : maxDocId;
         } else {
-          pls.get(w)[1] = (int) (pls.get(w)[1]) + 1;
+          pls.get(w)[1] = ((int) pls.get(w)[1]) + 1;
         }
       }
     }
