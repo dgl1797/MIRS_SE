@@ -32,8 +32,9 @@ public class PostingList {
 
   public boolean next() {
     try {
-
-      this.postingList.position(this.postingList.position() + postingSize);//Arrays.copyOfRange(this.postingList, this.pointer, this.pointer + (Integer.BYTES*2));
+      this.postingList.position(this.postingList.position() + postingSize);
+      if (this.postingList.position() >= (this.totalLength * 2))
+        return false;
       return true;
     } catch (IndexOutOfBoundsException e) {
       System.out.println("Error during next() function, array out of bound: " + e.getMessage());
@@ -47,12 +48,14 @@ public class PostingList {
 
   public static PostingList openList(int startPosition, int plLength) throws IOException {
     PostingList postinglist = null;
-    byte[] pl = new byte[plLength];
+    int bytelength = plLength * 2 * Integer.BYTES;
+    byte[] pl = new byte[bytelength];
     String invertedIndexStr = String.format("inverted_index.dat");
     Path invertedIndexPath = Paths.get(Constants.OUTPUT_DIR.toString(), invertedIndexStr);
     try (FileInputStream fileInvInd = new FileInputStream(invertedIndexPath.toString())) {
 
-      fileInvInd.read(pl, startPosition, plLength);
+      fileInvInd.skip(startPosition);
+      fileInvInd.read(pl);
 
       postinglist = new PostingList();
       postinglist.postingList = ByteBuffer.wrap(pl).asIntBuffer();
@@ -75,41 +78,58 @@ public class PostingList {
       return true;
     }
 
+    if ((this.postingList.position() + postingSize) >= this.postingList.capacity())
+      return false;
+
     if (this.postingList.get(this.postingList.position() + postingSize) >= docid) {
       this.postingList.position(this.postingList.position() + postingSize);
       return true;
     }
 
-    int rightPosition = this.postingList.capacity();
+    int rightOffset = this.postingList.capacity();
+    int rightPosition = ((int) rightOffset / 2);
 
-    if (this.postingList.get(rightPosition - 1) < docid) {
+    if (this.postingList.get(rightOffset - postingSize) < docid) {
       return false;
     }
-    int leftPosition = this.postingList.position() + postingSize;
-    int middlePosition = (int) Math.floor((leftPosition + rightPosition) / 2);
+    int leftOffset = this.postingList.position() + postingSize;
+    int leftPosition = ((int) (leftOffset) / 2);
+    int middlePosition = ((int) Math.floor((leftPosition + rightPosition) / 2));
+    int middleOffset = middlePosition * 2;
 
-    while (this.postingList.get(middlePosition) != docid) {
+    while (this.postingList.get(middleOffset) != docid) {
       if ((rightPosition - leftPosition) == 1) {
-        this.postingList.position(rightPosition);
+        if (rightOffset == this.postingList.capacity())
+          return false;
+        this.postingList.position(rightOffset);
         return true;
       }
 
-      int midVal = this.postingList.get(middlePosition);
+      int midVal = this.postingList.get(middleOffset);
       if (docid > midVal) {
         leftPosition = middlePosition;
+        leftOffset = middleOffset;
       } else {
         rightPosition = middlePosition;
+        rightOffset = middleOffset;
       }
       middlePosition = (int) Math.floor((leftPosition + rightPosition) / 2);
+      middleOffset = middlePosition * 2;
     }
 
-    this.postingList.position(middlePosition);
+    this.postingList.position(middleOffset);
     return true;
   }
 
-  public double score(int ndocs, int plLength, int noccurrences, int doclen, double avdl) {
+  public double score(int ndocs, int noccurrences, int doclen, double avdl) {
     int tf = getFreq();
     return noccurrences * ((tf) / (Constants.K_ONE * ((1 - Constants.B) + (Constants.B * doclen / avdl)) + tf)
-        * Math.log10(ndocs / plLength));
+        * Math.log10(ndocs / this.totalLength));
   }
+
+  public double tfidf(int ndocs, int noccurences) {
+    int tf = getFreq();
+    return noccurences * (1 + (Math.log10(tf))) * Math.log10(ndocs / this.totalLength);
+  }
+
 }
