@@ -11,7 +11,6 @@ import java.util.Arrays;
 import java.util.Scanner;
 
 import unipi.mirs.components.IndexBuilder;
-import unipi.mirs.components.PostingList;
 import unipi.mirs.graphics.ConsoleUX;
 import unipi.mirs.graphics.Menu;
 import unipi.mirs.utilities.Constants;
@@ -89,6 +88,24 @@ public class IndexManager {
                 // calculating if there was a remaining chunk that we need to consider in the next iteration
                 remainingChunk = ((windowsize%2) != 0);
             }
+            // removing _0 from last produced chunks
+            File lastchunk = new File(Paths.get(Constants.OUTPUT_DIR.toString(), "inverted_index_0.dat").toString());
+            if(!lastchunk.exists()){
+                ConsoleUX.ErrorLog("Unexpected error in the merging phase: "+lastchunk.toString()+" should exist but doesn't");
+            }
+            File finalName = new File(Paths.get(Constants.OUTPUT_DIR.toString(),"inverted_index.dat").toString());
+            if(finalName.exists()) finalName.delete();
+            while(!lastchunk.renameTo(finalName));
+
+            lastchunk = new File(Paths.get(Constants.OUTPUT_DIR.toString(), "lexicon_0.dat").toString());
+            if(!lastchunk.exists()){
+                ConsoleUX.ErrorLog("Unexpected error in the merging phase: "+lastchunk.toString()+" should exist but doesn't");
+            }
+            finalName = new File(Paths.get(Constants.OUTPUT_DIR.toString(), "lexicon.dat").toString());
+            if(finalName.exists()) finalName.delete();
+            while(!lastchunk.renameTo(finalName));
+            // endof merge
+
             ConsoleUX.SuccessLog("Merged " + nchunks + " Chunks");
             ConsoleUX.pause(true, stdin);
         } catch (IOException e) {
