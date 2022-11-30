@@ -6,6 +6,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Scanner;
+import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.Map.Entry;
 
@@ -58,103 +59,180 @@ public class SearchEngine {
     TreeSet<Entry<String, Double>> top20 = new TreeSet<>(new Comparator<Entry<String, Double>>() {
       @Override
       public int compare(Entry<String, Double> e1, Entry<String, Double> e2) {
-        return e2.getValue().compareTo(e1.getValue());
+        if (e1.getKey().compareTo(e2.getKey()) == 0) {
+          return 0;
+        } else {
+          if (e2.getValue().compareTo(e1.getValue()) < 0) {
+            return -1;
+          } else {
+            return 1;
+          }
+        }
       }
     });
-
-    String queryClean = TextNormalizationFunctions.cleanText(query);
+    query = TextNormalizationFunctions.cleanText(query);
     HashMap<String, Object[]> pls = new HashMap<>();
-    int maxDocId = 0;
-    boolean isOver = false;
-
-    for (String w : queryClean.split(" ")) {
+    int maxdocid = -1;
+    int oldMax = -1;
+    for (String w : query.split(" ")) {
       if (!stopwords.contains(w)) {
         w = TextNormalizationFunctions.ps.stem(w);
-        if (!pls.containsKey(w)) {
-          // one of the terms is not present anywhere
-          if (!lexicon.vocabulary.containsKey(w))
-            return top20;
+        // if even one term is not present in the whole collection, returns empty list
+        if (!lexicon.vocabulary.containsKey(w))
+          return top20;
 
+        if (pls.containsKey(w)) {
+          pls.get(w)[1] = ((int) pls.get(w)[1]) + 1;
+        } else {
           pls.put(w,
               new Object[] { PostingList.openList(lexicon.vocabulary.get(w)[0], lexicon.vocabulary.get(w)[1]), 1 });
-          maxDocId = ((PostingList) pls.get(w)[0]).getDocID() > maxDocId ? ((PostingList) pls.get(w)[0]).getDocID()
-              : maxDocId;
+          // check if the opened docid is greater than maxdocid
+          int currentdocid = ((PostingList) pls.get(w)[0]).getDocID();
+          maxdocid = (currentdocid > maxdocid) ? currentdocid : maxdocid;
+        }
+      }
+    }
+
+    // pls.size() == 0 means no terms are valid
+    if (pls.size() == 0)
+      return top20;
+
+    boolean isover = false;
+    while (!isover) {
+      while (oldMax != maxdocid) {
+        oldMax = maxdocid;
+        // looping over all the postings untill we reach a common maxdocid (oldmax will not change)
+        for (String w : pls.keySet()) {
+          if (!((PostingList) pls.get(w)[0]).nextGEQ(maxdocid)) {
+            isover = true;
+            break;
+          }
+          // update the maxdocid
+          int currentdocid = ((PostingList) pls.get(w)[0]).getDocID();
+          maxdocid = (currentdocid > maxdocid) ? currentdocid : maxdocid;
+        }
+        if (isover)
+          break;
+      }
+      if (isover)
+        break;
+      // we are sure that all docids are the same and equal to maxdocid and we compute the score
+      double total = 0;
+      for (String w : pls.keySet()) {
+        double currentscore = isTFIDF ? ((PostingList) pls.get(w)[0]).tfidf(doctable.ndocs, ((int) pls.get(w)[1]))
+            : ((PostingList) pls.get(w)[0]).score(doctable.ndocs, ((int) pls.get(w)[1]),
+                ((int) doctable.doctable.get(maxdocid)[1]), doctable.avgDocLen);
+        total += currentscore;
+      }
+      // we have the score of the document maxdocid, now we insert it into the top20
+      if (top20.size() == 20) {
+        // limit reached, we need to check if last item (smallest) is lower than total
+        if (top20.last().getValue() < total) {
+          // we need to replace last item:
+          top20.pollLast();
+          top20.add(new AbstractMap.SimpleEntry<String, Double>((String) doctable.doctable.get(maxdocid)[0], total));
+        }
+      } else {
+        // still not reached the limit so we simply add
+        top20.add(new AbstractMap.SimpleEntry<String, Double>((String) doctable.doctable.get(maxdocid)[0], total));
+      }
+
+      // advance the positions of each postinglist
+      for (String w : pls.keySet()) {
+        if (!((PostingList) pls.get(w)[0]).next()) {
+          // returned false hence posting list is over so we need to break
+          isover = true;
+          break;
+        }
+        // update maxdocid
+        int currentdocid = ((PostingList) pls.get(w)[0]).getDocID();
+        maxdocid = (currentdocid > maxdocid) ? currentdocid : maxdocid;
+      }
+      if (isover)
+        break;
+    }
+
+    return top20;
+  }
+
+  //overload
+  private static TreeSet<Entry<String, Double>> search(String query, boolean isDisjunctive) throws IOException {
+    TreeSet<Entry<String, Double>> top20 = new TreeSet<>(new Comparator<Entry<String, Double>>() {
+      @Override
+      public int compare(Entry<String, Double> e1, Entry<String, Double> e2) {
+        if (e1.getKey().compareTo(e2.getKey()) == 0) {
+          return 0;
+        } else {
+          if (e2.getValue().compareTo(e1.getValue()) < 0) {
+            return -1;
+          } else {
+            return 1;
+          }
+        }
+      }
+    });
+    query = TextNormalizationFunctions.cleanText(query);
+    HashMap<String, Object[]> pls = new HashMap<>();
+    TreeMap<Integer, Double> partialScores = new TreeMap<>();
+
+    for (String w : query.split(" ")) {
+      if (!stopwords.contains(w)) {
+        w = TextNormalizationFunctions.ps.stem(w);
+        // ignoring the terms that are not present in the lexicon
+        if (!lexicon.vocabulary.containsKey(w))
+          continue;
+
+        if (!pls.containsKey(w)) {
+          pls.put(w,
+              new Object[] { PostingList.openList(lexicon.vocabulary.get(w)[0], lexicon.vocabulary.get(w)[1]), 1 });
         } else {
           pls.get(w)[1] = ((int) pls.get(w)[1]) + 1;
         }
       }
     }
 
-    // only stopwords or empty string
     if (pls.size() == 0)
       return top20;
 
-    int oldMax = -1;
-    while (!isOver) {
-      while (oldMax != maxDocId) {
-        oldMax = maxDocId;
-        for (String w : pls.keySet()) {
-          if (!((PostingList) pls.get(w)[0]).nextGEQ(maxDocId)) {
-            isOver = true;
-            break;
-          }
-          maxDocId = (((PostingList) pls.get(w)[0]).getDocID() > maxDocId) ? (((PostingList) pls.get(w)[0]).getDocID())
-              : maxDocId;
-
-        }
-      }
-      if (isOver) {
-        break;
-      }
-      double total = 0;
+    int completedPostingLists = 0;
+    while (completedPostingLists < pls.size()) {
+      // evaluate the current docid's score updating the partialscore of the docids
       for (String w : pls.keySet()) {
-        total += (!isTFIDF)
-            ? ((PostingList) pls.get(w)[0]).score(doctable.ndocs, ((int) pls.get(w)[1]),
-                (int) doctable.doctable.get(maxDocId)[1], doctable.avgDocLen)
-            : ((PostingList) pls.get(w)[0]).tfidf(doctable.ndocs, ((int) pls.get(w)[1]));
-      }
-      if (top20.size() == 20) {
-        if (total < top20.last().getValue()) {
-          for (String w : pls.keySet()) {
-            int nextdocid;
-            if (((PostingList) pls.get(w)[0]).next()) {
-              nextdocid = ((PostingList) pls.get(w)[0]).getDocID();
-              if (maxDocId < nextdocid) {
-                maxDocId = nextdocid;
-              }
-            } else {
-              // no more terms in at least 1 posting list hence quits the for and the while by setting isover as true
-              isOver = true;
-              break;
-            }
-          }
-          if (isOver)
-            break;
+        // if postinglist is over skip it
+        if (((PostingList) pls.get(w)[0]).isover())
           continue;
-        }
-        top20.pollLast();
-      }
-      top20.add(new AbstractMap.SimpleEntry<String, Double>((String) doctable.doctable.get(maxDocId)[0], total));
-      for (String w : pls.keySet()) {
-        int nextdocid;
-        if (((PostingList) pls.get(w)[0]).next()) {
-          nextdocid = ((PostingList) pls.get(w)[0]).getDocID();
-          if (maxDocId < nextdocid) {
-            maxDocId = nextdocid;
-          }
+
+        int currentdocid = ((PostingList) pls.get(w)[0]).getDocID();
+        double currentscore = isTFIDF ? ((PostingList) pls.get(w)[0]).tfidf(doctable.ndocs, ((int) pls.get(w)[1]))
+            : ((PostingList) pls.get(w)[0]).score(doctable.ndocs, ((int) pls.get(w)[1]),
+                ((int) doctable.doctable.get(currentdocid)[1]), doctable.avgDocLen);
+        // update partial score
+        if (!partialScores.containsKey(currentdocid)) {
+          partialScores.put(currentdocid, currentscore);
         } else {
-          // no more terms in at least 1 posting list hence quits the while
-          isOver = true;
-          break;
+          partialScores.put(currentdocid, partialScores.get(currentdocid) + currentscore);
         }
+        // move the postinglist to the next iteration
+        if (!((PostingList) pls.get(w)[0]).next()) {
+          // posting list is over
+          completedPostingLists += 1;
+        }
+      }
+      // remove the mindocid which is the first element of the partialscore heap sorted by docid and add it to top20
+      Entry<Integer, Double> polledEntry = partialScores.pollFirstEntry();
+      if (top20.size() == 20) {
+        if (top20.last().getValue() < polledEntry.getValue()) {
+          // if the lowest in top20 is lower than the polled docid score we remove the last and add the polled one
+          top20.pollLast();
+          top20.add(new AbstractMap.SimpleEntry<String, Double>((String) doctable.doctable.get(polledEntry.getKey())[0],
+              polledEntry.getValue()));
+        }
+      } else {
+        // simply adds the polled element
+        top20.add(new AbstractMap.SimpleEntry<String, Double>((String) doctable.doctable.get(polledEntry.getKey())[0],
+            polledEntry.getValue()));
       }
     }
-    return top20;
-  }
-
-  //overload
-  private static TreeSet<Entry<String, Double>> search(String query, boolean isDisjunctive) throws IOException {
-    TreeSet<Entry<String, Double>> top20 = new TreeSet<>();
     return top20;
   }
 

@@ -121,6 +121,10 @@ public class PostingList {
     return true;
   }
 
+  public boolean isover() {
+    return this.postingList.position() >= this.postingList.capacity();
+  }
+
   public double score(int ndocs, int noccurrences, int doclen, double avdl) {
     int tf = getFreq();
     return noccurrences * ((tf) / (Constants.K_ONE * ((1 - Constants.B) + (Constants.B * doclen / avdl)) + tf)
