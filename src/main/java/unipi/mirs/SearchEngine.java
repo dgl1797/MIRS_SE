@@ -1,137 +1,213 @@
 package unipi.mirs;
 
-import java.io.BufferedReader;
-import java.io.File;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.Arrays;
+import java.util.AbstractMap;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Scanner;
+import java.util.TreeSet;
+import java.util.Map.Entry;
 
-import unipi.mirs.components.IndexBuilder;
+import unipi.mirs.components.DocTable;
+import unipi.mirs.components.Vocabulary;
 import unipi.mirs.graphics.ConsoleUX;
-import unipi.mirs.graphics.Menu;
-import unipi.mirs.utilities.Constants;
+import unipi.mirs.components.PostingList;
+import unipi.mirs.utilities.TextNormalizationFunctions;
 
 public class SearchEngine {
+  private static final Scanner stdin = new Scanner(System.in);
+  private static boolean isConjunctive = false;
+  private static boolean isTFIDF = true;
 
-    private static String inputFile = Paths.get(Constants.INPUT_DIR.toString(), "collection.tsv").toString();
-    private static boolean readCompressed = false;
-    private static final Scanner stdin = new Scanner(System.in);
+  private static HashSet<String> stopwords = null;
+  private static Vocabulary lexicon = null;
+  private static DocTable doctable = null;
 
-    /**
-     * Allows the user to select a new file as collection of the search engine, the collection has to be in .tsv format
-     * with 'docno\tdocbody\n' format, the tsv file can also be passed with gzip commpression and the function will
-     * automatically select if the file needs to be parsed with decompressor or not It will modify inputFile and
-     * readCompressed class' static parameters in-place.
-     * 
-     * @throws IOException
-     */
-    private static void changeInputFile() throws IOException {
-        File inputDir = new File(Constants.INPUT_DIR.toString());
+  private static boolean handleCommand(String command) {
+    if (command.toLowerCase().equals("exit"))
+      return true;
 
-        String[] files = Arrays.asList(inputDir.listFiles()).stream().filter((f) -> f.isFile())
-                .filter((f) -> f.toString().matches(".*\\.gz$") || f.toString().matches(".*\\.tsv$"))
-                .map(f -> f.toString()).toArray(String[]::new);
+    if (command.toLowerCase().equals("mode")) {
+      isConjunctive = !isConjunctive;
+    } else if (command.toLowerCase().equals("score")) {
+      isTFIDF = !isTFIDF;
+    } else if (command.toLowerCase().equals("file")) {
+      ConsoleUX.DebugLog("Work in progress");
+      ConsoleUX.pause(true, stdin);
+    } else if (command.toLowerCase().equals("help")) {
+      ConsoleUX.SuccessLog(ConsoleUX.CLS + "/help/ - prints the guide for all possible commands");
+      ConsoleUX.SuccessLog("/mode/ - changes query mode(conjunctive - disjunctive)");
+      ConsoleUX.SuccessLog("/score/ - changes scoring function to be used for ranked retrieval(TFIDF - BM25)");
+      ConsoleUX.SuccessLog("/file/ - performs queries taking them from a selected file");
+      ConsoleUX.SuccessLog("/exit/ - stops the interactive search");
+      ConsoleUX.pause(true, stdin);
+    } else {
+      ConsoleUX.ErrorLog(ConsoleUX.CLS + "Unknown Command:");
+      ConsoleUX.SuccessLog("/help/ - prints the guide for all possible commands");
+      ConsoleUX.SuccessLog("/mode/ - changes query mode(conjunctive - disjunctive)");
+      ConsoleUX.SuccessLog("/score/ - changes scoring function to be used for ranked retrieval(TFIDF - BM25)");
+      ConsoleUX.SuccessLog("/file/ - performs queries taking them from a selected file");
+      ConsoleUX.SuccessLog("/exit/ - stops the interactive search");
+      ConsoleUX.pause(true, stdin);
+    }
+    return false;
+  }
 
-        if (Arrays.asList(files).size() == 0) {
-            ConsoleUX.ErrorLog(
-                    "No files found, make sure to import a .tsv or .gz file inside " + Constants.INPUT_DIR + " folder");
-            inputFile = "";
+  private static TreeSet<Entry<String, Double>> search(String query) throws IOException {
+    TreeSet<Entry<String, Double>> top20 = new TreeSet<>(new Comparator<Entry<String, Double>>() {
+      @Override
+      public int compare(Entry<String, Double> e1, Entry<String, Double> e2) {
+        return e2.getValue().compareTo(e1.getValue());
+      }
+    });
+
+    String queryClean = TextNormalizationFunctions.cleanText(query);
+    HashMap<String, Object[]> pls = new HashMap<>();
+    int maxDocId = 0;
+    boolean isOver = false;
+
+    for (String w : queryClean.split(" ")) {
+      if (!stopwords.contains(w)) {
+        w = TextNormalizationFunctions.ps.stem(w);
+        if (!pls.containsKey(w)) {
+          // one of the terms is not present anywhere
+          if (!lexicon.vocabulary.containsKey(w))
+            return top20;
+
+          pls.put(w,
+              new Object[] { PostingList.openList(lexicon.vocabulary.get(w)[0], lexicon.vocabulary.get(w)[1]), 1 });
+          maxDocId = ((PostingList) pls.get(w)[0]).getDocID() > maxDocId ? ((PostingList) pls.get(w)[0]).getDocID()
+              : maxDocId;
+        } else {
+          pls.get(w)[1] = ((int) pls.get(w)[1]) + 1;
         }
-        Menu filesMenu = new Menu(stdin, files);
-        inputFile = files[filesMenu.printMenu()];
-        if (inputFile.matches(".*\\.gz$"))
-            readCompressed = true;
+      }
     }
 
-    /**
-     * Builds the inverted index by first creating the sorted chunks of the collection, then merging them in a
-     * merge-sort-like fashion; it will allow the creation in debug mode which will create debug files containing the
-     * core informations of each chunk of files
-     */
-    private static void buildIndex() {
-        if (readCompressed) {
+    // only stopwords or empty string
+    if (pls.size() == 0)
+      return top20;
+
+    int oldMax = -1;
+    while (!isOver) {
+      while (oldMax != maxDocId) {
+        oldMax = maxDocId;
+        for (String w : pls.keySet()) {
+          if (!((PostingList) pls.get(w)[0]).nextGEQ(maxDocId)) {
+            isOver = true;
+            break;
+          }
+          maxDocId = (((PostingList) pls.get(w)[0]).getDocID() > maxDocId) ? (((PostingList) pls.get(w)[0]).getDocID())
+              : maxDocId;
 
         }
-        ConsoleUX.DebugLog(ConsoleUX.CLS + "Processing File...");
-        try (BufferedReader inreader = Files.newBufferedReader(Path.of(inputFile), StandardCharsets.UTF_8)) {
-            String document;
-            IndexBuilder vb = new IndexBuilder(stdin);
-            while ((document = inreader.readLine()) != null) {
-                vb.addDocument(document);
+      }
+      if (isOver) {
+        break;
+      }
+      double total = 0;
+      for (String w : pls.keySet()) {
+        total += (!isTFIDF)
+            ? ((PostingList) pls.get(w)[0]).score(doctable.ndocs, ((int) pls.get(w)[1]),
+                (int) doctable.doctable.get(maxDocId)[1], doctable.avgDocLen)
+            : ((PostingList) pls.get(w)[0]).tfidf(doctable.ndocs, ((int) pls.get(w)[1]));
+      }
+      if (top20.size() == 20) {
+        if (total < top20.last().getValue()) {
+          for (String w : pls.keySet()) {
+            int nextdocid;
+            if (((PostingList) pls.get(w)[0]).next()) {
+              nextdocid = ((PostingList) pls.get(w)[0]).getDocID();
+              if (maxDocId < nextdocid) {
+                maxDocId = nextdocid;
+              }
+            } else {
+              // no more terms in at least 1 posting list hence quits the for and the while by setting isover as true
+              isOver = true;
+              break;
             }
-            vb.write_chunk();
-            vb.closeDocTable();
-            ConsoleUX.SuccessLog("Index Builded succesfully.");
-            ConsoleUX.pause(true, stdin);
-            int nchunks = vb.getNChunks();
-            ConsoleUX.DebugLog("Merging " + nchunks + " Chunks...");
-            boolean remainingChunk = false;
-            //@formatter:off
-            for (int windowsize = nchunks; windowsize > 0; windowsize = (int)Math.floor(windowsize/2)) {
-                // reset the chunkID to 0
-                int assignIndex = 0;
-                // windowsize will be the previous windowsize/2 + the eventual odd chunk if windowsize was odd
-                windowsize = remainingChunk ? windowsize+1 : windowsize;
-                if(windowsize == 1) break; // we have a single chunk which means we don't need to merge anymore
-                for (int left = 0; left < windowsize; left += 2) {
-                    // if left == right we will just rename the chunk and bring it to the next merge iteration
-                    int right = Math.min(left + 1, windowsize-1);
-                    // merges the next two chunks into chunkid assignindex
-                    vb.merge(left, right, assignIndex);
-                    // increase the chunkID
-                    assignIndex++;
-                }
-                // calculating if there was a remaining chunk that we need to consider in the next iteration
-                remainingChunk = ((windowsize%2) != 0);
-            }
-            ConsoleUX.SuccessLog("Merged " + nchunks + " Chunks");
-            ConsoleUX.pause(true, stdin);
-        } catch (IOException e) {
-            ConsoleUX.ErrorLog("Unable to create index for " + inputFile + ":\n" + e.getMessage());
-            ConsoleUX.pause(false, stdin);
+          }
+          if (isOver)
+            break;
+          continue;
         }
+        top20.pollLast();
+      }
+      top20.add(new AbstractMap.SimpleEntry<String, Double>((String) doctable.doctable.get(maxDocId)[0], total));
+      for (String w : pls.keySet()) {
+        int nextdocid;
+        if (((PostingList) pls.get(w)[0]).next()) {
+          nextdocid = ((PostingList) pls.get(w)[0]).getDocID();
+          if (maxDocId < nextdocid) {
+            maxDocId = nextdocid;
+          }
+        } else {
+          // no more terms in at least 1 posting list hence quits the while
+          isOver = true;
+          break;
+        }
+      }
     }
+    return top20;
+  }
 
-    /**
-     * Completely clean the data/output directory from files
-     */
-    private static void cleanOutput(){
-        File outputfolder = new File(Constants.OUTPUT_DIR.toString());
-        //@formatter:on
-        File[] files = Arrays.asList(outputfolder.listFiles()).stream().filter((f) -> f.isFile()).toArray(File[]::new);
-        for (File f : files) {
-            f.delete();
+  //overload
+  private static TreeSet<Entry<String, Double>> search(String query, boolean isDisjunctive) throws IOException {
+    TreeSet<Entry<String, Double>> top20 = new TreeSet<>();
+    return top20;
+  }
+
+  public static void main(String[] args) throws IOException {
+    try {
+      // setup
+      ConsoleUX.DebugLog(ConsoleUX.CLS + "Loading...");
+      lexicon = new Vocabulary();
+      lexicon.loadVocabulary();
+      doctable = new DocTable();
+      doctable.loadDocTable();
+      stopwords = TextNormalizationFunctions.load_stopwords();
+      // guide
+      TreeSet<Entry<String, Double>> top20 = new TreeSet<>();
+      ConsoleUX.SuccessLog(ConsoleUX.CLS + "Commands:\n/help/ - prints the guide for all possible commands");
+      ConsoleUX.SuccessLog("/mode/ - changes query mode(conjunctive - disjunctive)");
+      ConsoleUX.SuccessLog("/score/ - changes scoring function to be used for ranked retrieval(TFIDF - BM25)");
+      ConsoleUX.SuccessLog("/file/ - performs queries taking them from a selected file");
+      ConsoleUX.SuccessLog("/exit/ - quits the search engine");
+      // interactive querying
+      while (true) {
+        ConsoleUX.SuccessLog("Search", "");
+        ConsoleUX.DebugLog("[" + (isConjunctive ? "c" : "d") + "]", "");
+        ConsoleUX.DebugLog("[" + (isTFIDF ? "tfidf" : "bm25") + "]", "");
+        ConsoleUX.SuccessLog(": ", "");
+        String query = stdin.nextLine();
+        // query system commands
+        if (query.matches("^\\/(help|mode|score|file|exit)\\/$")) {
+          if (handleCommand(query.replaceAll("\\/", ""))) {
+            // termination if user enters /exit/ in the search field
+            break;
+          }
+          System.out.print(ConsoleUX.CLS);
+          continue;
         }
-        ConsoleUX.SuccessLog("Cleaning complete.");
+
+        // query start
+        long before = System.currentTimeMillis();
+        top20 = isConjunctive ? search(query) : search(query, true);
+        long delta = System.currentTimeMillis() - before;
+        // query end
+
+        // documents printing
+        int position = 0;
+        ConsoleUX.DebugLog("Parsed " + doctable.ndocs + " documents in " + delta + "ms:");
+        for (Entry<String, Double> doc : top20) {
+          ConsoleUX.SuccessLog((++position) + ".\t" + doc.getKey() + " - " + doc.getValue());
+        }
         ConsoleUX.pause(true, stdin);
+      }
+    } catch (IOException e) {
+      ConsoleUX.ErrorLog("Search failed:");
+      ConsoleUX.ErrorLog(e.getMessage());
     }
-
-    public static void main(String[] args) throws IOException {
-        // Save index in a file, compressed index in another one to avoid re-building index every time
-        Menu menu = new Menu(stdin, "Change Input File", "Build Index", "Compress Inverted Index", "Clean output",
-                "Exit");
-        int opt = 0;
-        while ((opt = menu.printMenu(
-                ConsoleUX.FG_BLUE + ConsoleUX.BOLD + "Selected File: " + inputFile + ConsoleUX.RESET)) != menu
-                        .exitMenuOption()) {
-            if (opt == 0) {
-                changeInputFile();
-            } else if (opt == 1) {
-                buildIndex();
-            } else if (opt == 2) {
-                // Compression of the inverted index
-            } else if (opt == 3) {
-                cleanOutput();
-            }
-        }
-        System.out.println(ConsoleUX.CLS + ConsoleUX.FG_YELLOW + ConsoleUX.BOLD
-                + "UI NID TU EGZIT, UOT MATTEMMATTICCALLI DU UI DU? UI COMMPLITLLY FORMÀT D COMPIUTTER, UAAI?");
-        System.out.println(
-                "DU UI LAIK TU UEIST SPEIS? DU UI LAIK TU UEIST TIME? 0,0001 milliseconds to exit" + ConsoleUX.RESET);
-        System.exit(0);
-    }
+  }
 }

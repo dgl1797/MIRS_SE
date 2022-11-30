@@ -57,7 +57,7 @@ public class Menu {
     boolean error = false;
     do {
       System.out.print(ConsoleUX.CLS);
-      System.out.println(title);
+      System.out.println(ConsoleUX.FG_BLUE + ConsoleUX.BOLD + title);
       for (int i = 0; i < numOptions; i++) {
         ConsoleUX.SuccessLog(" " + (i + 1) + " > " + options.get(i));
       }
@@ -68,6 +68,10 @@ public class Menu {
       try {
         choice = Integer.parseInt(tmp);
       } catch (Exception e) {
+        for (int i = 0; i < numOptions; i++) {
+          if (tmp.toLowerCase().equals(options.get(i).toLowerCase()))
+            choice = i + 1;
+        }
       }
       error = true;
     } while (!(choice >= 1 && choice <= numOptions));

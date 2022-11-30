@@ -44,7 +44,7 @@ public class IndexBuilder {
    * @throws IOException
    */
   private void write_doctable(String docno, int docid, int doclen) throws IOException {
-    String doctcontent = String.format("%s\t%d %d\n", docno, docid, doclen);
+    String doctcontent = String.format("%d\t%s-%d\n", docid, docno, doclen);
     this.doctable.write(doctcontent);
   }
 
@@ -52,7 +52,7 @@ public class IndexBuilder {
     this.stdin = stdin;
 
     // detection of another instance of index, request for overwrite mode
-    File dtf = new File(Paths.get(Constants.OUTPUT_DIR.toString(), "doctable_test.dat").toString());
+    File dtf = new File(Paths.get(Constants.OUTPUT_DIR.toString(), "doctable.dat").toString());
     if (dtf.exists()) {
       ConsoleUX.ErrorLog("Index already present, opearte in overwite mode? [Y/n]: ", "");
       String choice = this.stdin.nextLine().toLowerCase();
