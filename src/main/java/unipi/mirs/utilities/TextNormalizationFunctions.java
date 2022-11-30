@@ -16,12 +16,12 @@ public final class TextNormalizationFunctions {
   public static final PorterStemmer ps = new PorterStemmer();
 
   public static String cleanText(String txt) {
-    //@formatter:off
-    return txt.toLowerCase().replaceAll("[^\\p{L}\\s]+", " ")
-        .replaceAll("ã â â", " ")
-        .replaceAll("â", "")
+    // @formatter:off
+    return txt.toLowerCase()
+        .replaceAll(".\\u0080.", " ")
+        .replaceAll("[^\\p{L}\\w\\s]+", " ")
         .replaceAll("[\\s]+", " ").trim();
-    //@formatter:on
+    // @formatter:on
   }
 
   public static HashSet<String> load_stopwords() throws IOException {
