@@ -6,6 +6,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Scanner;
+import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.Map.Entry;
 
@@ -70,10 +71,10 @@ public class SearchEngine {
     for (String w : queryClean.split(" ")) {
       if (!stopwords.contains(w)) {
         w = TextNormalizationFunctions.ps.stem(w);
+        // one of the terms is not present anywhere
+        if (!lexicon.vocabulary.containsKey(w))
+          return top20;
         if (!pls.containsKey(w)) {
-          // one of the terms is not present anywhere
-          if (!lexicon.vocabulary.containsKey(w))
-            return top20;
 
           pls.put(w,
               new Object[] { PostingList.openList(lexicon.vocabulary.get(w)[0], lexicon.vocabulary.get(w)[1]), 1 });
@@ -154,7 +155,74 @@ public class SearchEngine {
 
   //overload
   private static TreeSet<Entry<String, Double>> search(String query, boolean isDisjunctive) throws IOException {
-    TreeSet<Entry<String, Double>> top20 = new TreeSet<>();
+    TreeSet<Entry<String, Double>> top20 = new TreeSet<>(new Comparator<Entry<String, Double>>() {
+      @Override
+      public int compare(Entry<String, Double> e1, Entry<String, Double> e2) {
+        return e2.getValue().compareTo(e1.getValue());
+      }
+    });
+    query = TextNormalizationFunctions.cleanText(query);
+    HashMap<String, Object[]> pls = new HashMap<>();
+    TreeMap<Integer, Double> partialScores = new TreeMap<>();
+
+    for (String w : query.split(" ")) {
+      if (!stopwords.contains(w)) {
+        w = TextNormalizationFunctions.ps.stem(w);
+        // ignoring the terms that are not present in the lexicon
+        if (!lexicon.vocabulary.containsKey(w))
+          continue;
+
+        if (!pls.containsKey(w)) {
+          pls.put(w,
+              new Object[] { PostingList.openList(lexicon.vocabulary.get(w)[0], lexicon.vocabulary.get(w)[1]), 1 });
+        } else {
+          pls.get(w)[1] = ((int) pls.get(w)[1]) + 1;
+        }
+      }
+    }
+
+    if (pls.size() == 0)
+      return top20;
+
+    int completedPostingLists = 0;
+    while (completedPostingLists < pls.size()) {
+      // evaluate the current docid's score updating the partialscore of the docids
+      for (String w : pls.keySet()) {
+        // if postinglist is over skip it
+        if (((PostingList) pls.get(w)[0]).isover())
+          continue;
+
+        int currentdocid = ((PostingList) pls.get(w)[0]).getDocID();
+        double currentscore = isTFIDF ? ((PostingList) pls.get(w)[0]).tfidf(doctable.ndocs, ((int) pls.get(w)[1]))
+            : ((PostingList) pls.get(w)[0]).score(doctable.ndocs, ((int) pls.get(w)[1]),
+                ((int) doctable.doctable.get(currentdocid)[1]), doctable.avgDocLen);
+        // update partial score
+        if (!partialScores.containsKey(currentdocid)) {
+          partialScores.put(currentdocid, currentscore);
+        } else {
+          partialScores.put(currentdocid, partialScores.get(currentdocid) + currentscore);
+        }
+        // move the postinglist to the next iteration
+        if (!((PostingList) pls.get(w)[0]).next()) {
+          // posting list is over
+          completedPostingLists += 1;
+        }
+      }
+      // remove the mindocid which is the first element of the partialscore heap sorted by docid and add it to top20
+      Entry<Integer, Double> polledEntry = partialScores.pollFirstEntry();
+      if (top20.size() == 20) {
+        if (top20.last().getValue() < polledEntry.getValue()) {
+          // if the lowest in top20 is lower than the polled docid score we remove the last and add the polled one
+          top20.pollLast();
+          top20.add(new AbstractMap.SimpleEntry<String, Double>((String) doctable.doctable.get(polledEntry.getKey())[0],
+              polledEntry.getValue()));
+        }
+      } else {
+        // simply adds the polled element
+        top20.add(new AbstractMap.SimpleEntry<String, Double>((String) doctable.doctable.get(polledEntry.getKey())[0],
+            polledEntry.getValue()));
+      }
+    }
     return top20;
   }
 
