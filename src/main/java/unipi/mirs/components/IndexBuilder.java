@@ -31,6 +31,7 @@ public class IndexBuilder {
   /*resettable*/ private int currentDocID = 0;
   /*unresettable*/ private int currentChunkID = 0;
   private static final int CHUNKSIZE = 524_288; // 2^19
+  private static boolean stopnostem = false;
 
   // int[0] is the docid, int[1] the term frequency in the docid
   /*resettable*/ private TreeMap<String, ArrayList<int[]>> chunk;
@@ -48,9 +49,9 @@ public class IndexBuilder {
     this.doctable.write(doctcontent);
   }
 
-  public IndexBuilder(Scanner stdin) throws IOException {
+  public IndexBuilder(Scanner stdin, boolean stopnostem_mode) throws IOException {
     this.stdin = stdin;
-
+    this.stopnostem = stopnostem_mode;
     // detection of another instance of index, request for overwrite mode
     File dtf = new File(Paths.get(Constants.OUTPUT_DIR.toString(), "doctable.dat").toString());
     if (dtf.exists()) {
@@ -89,8 +90,9 @@ public class IndexBuilder {
     int doclen = 0;
     int realDocID = currentDocID + (CHUNKSIZE * currentChunkID);
     for (String t : docbody.split(" ")) {
-      if (!stopwords.contains(t)) {
-        t = TextNormalizationFunctions.ps.stem(t);
+
+      if (!stopwords.contains(t) || stopnostem) {
+        t = stopnostem ? t: TextNormalizationFunctions.ps.stem(t);
         doclen++;
         if (!chunk.containsKey(t)) {
           // it is the first time it appears in the chunk
@@ -128,12 +130,37 @@ public class IndexBuilder {
   public void write_chunk() throws IOException {
     if (currentDocID == 0)
       return;
-    String chunkinvertedindexname = String.format("inverted_index_%d.dat", currentChunkID);
-    String chunkdebugname = String.format("debug_%d.dbg", currentChunkID);
-    String chunkvocabularyname = String.format("lexicon_%d.dat", currentChunkID);
-    Path chunkinvertedindexPath = Paths.get(Constants.OUTPUT_DIR.toString(), chunkinvertedindexname);
-    Path chunkdebugPath = Paths.get(Constants.OUTPUT_DIR.toString(), chunkdebugname);
-    Path chunkvocabularyPath = Paths.get(Constants.OUTPUT_DIR.toString(), chunkvocabularyname);
+
+      String chunkinvertedindexname;
+      String chunkdebugname ;
+      String chunkvocabularyname ;
+      Path chunkinvertedindexPath ;
+      Path chunkdebugPath;
+      Path chunkvocabularyPath;
+
+    if(!stopnostem)
+    {
+      // No stopwords, Stemming active
+      chunkinvertedindexname = String.format("inverted_index_%d.dat", currentChunkID);
+      chunkdebugname = String.format("debug_%d.dbg", currentChunkID);
+      chunkvocabularyname = String.format("lexicon_%d.dat", currentChunkID);
+      chunkinvertedindexPath = Paths.get(Constants.OUTPUT_DIR.toString(), chunkinvertedindexname);
+      chunkdebugPath = Paths.get(Constants.OUTPUT_DIR.toString(), chunkdebugname);
+      chunkvocabularyPath = Paths.get(Constants.OUTPUT_DIR.toString(), chunkvocabularyname);
+
+    }
+    else
+    {
+      //With stopwords, Stemming disabled
+      chunkinvertedindexname = String.format("inverted_index_%d.dat", currentChunkID);
+      chunkdebugname = String.format("debug_%d.dbg", currentChunkID);
+      chunkvocabularyname = String.format("lexicon_%d.dat", currentChunkID);
+      chunkinvertedindexPath = Paths.get(Constants.STOPNOSTEM_OUTPUT_DIR.toString(), chunkinvertedindexname);
+      chunkdebugPath = Paths.get(Constants.STOPNOSTEM_OUTPUT_DIR.toString(), chunkdebugname);
+      chunkvocabularyPath = Paths.get(Constants.STOPNOSTEM_OUTPUT_DIR.toString(), chunkvocabularyname);
+
+    }
+
     File chunkinvertedindex = new File(chunkinvertedindexPath.toString());
     File chunkdebug = new File(chunkdebugPath.toString());
     File chunkvocabulary = new File(chunkvocabularyPath.toString());
