@@ -31,7 +31,8 @@ public class IndexBuilder {
   /*resettable*/ private int currentDocID = 0;
   /*unresettable*/ private int currentChunkID = 0;
   private static final int CHUNKSIZE = 524_288; // 2^19
-  private static boolean stopnostem = false;
+  private String SELECTED_PATH = null;
+  private boolean stopnostem = false;
 
   // int[0] is the docid, int[1] the term frequency in the docid
   /*resettable*/ private TreeMap<String, ArrayList<int[]>> chunk;
@@ -52,8 +53,9 @@ public class IndexBuilder {
   public IndexBuilder(Scanner stdin, boolean stopnostem_mode) throws IOException {
     this.stdin = stdin;
     this.stopnostem = stopnostem_mode;
+    this.SELECTED_PATH = stopnostem_mode ? Constants.STOPNOSTEM_OUTPUT_DIR.toString() : Constants.OUTPUT_DIR.toString();
     // detection of another instance of index, request for overwrite mode
-    File dtf = new File(Paths.get(Constants.OUTPUT_DIR.toString(), "doctable.dat").toString());
+    File dtf = new File(Paths.get(SELECTED_PATH, "doctable.dat").toString());
     if (dtf.exists()) {
       ConsoleUX.ErrorLog("Index already present, opearte in overwite mode? [Y/n]: ", "");
       String choice = this.stdin.nextLine().toLowerCase();
@@ -69,7 +71,7 @@ public class IndexBuilder {
     if (!choice.equals("n")) {
       this.debugmode = true;
     }
-    this.stopwords = TextNormalizationFunctions.load_stopwords();
+    this.stopwords = this.stopnostem ? new HashSet<>() : TextNormalizationFunctions.load_stopwords();
     dtf.createNewFile();
     this.doctable = new BufferedWriter(new FileWriter(dtf));
     this.chunk = new TreeMap<>();
@@ -90,9 +92,8 @@ public class IndexBuilder {
     int doclen = 0;
     int realDocID = currentDocID + (CHUNKSIZE * currentChunkID);
     for (String t : docbody.split(" ")) {
-
-      if (!stopwords.contains(t) || stopnostem) {
-        t = stopnostem ? t: TextNormalizationFunctions.ps.stem(t);
+      if (!stopwords.contains(t)) {
+        t = stopnostem ? t : TextNormalizationFunctions.ps.stem(t);
         doclen++;
         if (!chunk.containsKey(t)) {
           // it is the first time it appears in the chunk
@@ -131,35 +132,19 @@ public class IndexBuilder {
     if (currentDocID == 0)
       return;
 
-      String chunkinvertedindexname;
-      String chunkdebugname ;
-      String chunkvocabularyname ;
-      Path chunkinvertedindexPath ;
-      Path chunkdebugPath;
-      Path chunkvocabularyPath;
+    String chunkinvertedindexname;
+    String chunkdebugname;
+    String chunkvocabularyname;
+    Path chunkinvertedindexPath;
+    Path chunkdebugPath;
+    Path chunkvocabularyPath;
 
-    if(!stopnostem)
-    {
-      // No stopwords, Stemming active
-      chunkinvertedindexname = String.format("inverted_index_%d.dat", currentChunkID);
-      chunkdebugname = String.format("debug_%d.dbg", currentChunkID);
-      chunkvocabularyname = String.format("lexicon_%d.dat", currentChunkID);
-      chunkinvertedindexPath = Paths.get(Constants.OUTPUT_DIR.toString(), chunkinvertedindexname);
-      chunkdebugPath = Paths.get(Constants.OUTPUT_DIR.toString(), chunkdebugname);
-      chunkvocabularyPath = Paths.get(Constants.OUTPUT_DIR.toString(), chunkvocabularyname);
-
-    }
-    else
-    {
-      //With stopwords, Stemming disabled
-      chunkinvertedindexname = String.format("inverted_index_%d.dat", currentChunkID);
-      chunkdebugname = String.format("debug_%d.dbg", currentChunkID);
-      chunkvocabularyname = String.format("lexicon_%d.dat", currentChunkID);
-      chunkinvertedindexPath = Paths.get(Constants.STOPNOSTEM_OUTPUT_DIR.toString(), chunkinvertedindexname);
-      chunkdebugPath = Paths.get(Constants.STOPNOSTEM_OUTPUT_DIR.toString(), chunkdebugname);
-      chunkvocabularyPath = Paths.get(Constants.STOPNOSTEM_OUTPUT_DIR.toString(), chunkvocabularyname);
-
-    }
+    chunkinvertedindexname = String.format("inverted_index_%d.dat", currentChunkID);
+    chunkdebugname = String.format("debug_%d.dbg", currentChunkID);
+    chunkvocabularyname = String.format("lexicon_%d.dat", currentChunkID);
+    chunkinvertedindexPath = Paths.get(SELECTED_PATH, chunkinvertedindexname);
+    chunkdebugPath = Paths.get(SELECTED_PATH, chunkdebugname);
+    chunkvocabularyPath = Paths.get(SELECTED_PATH, chunkvocabularyname);
 
     File chunkinvertedindex = new File(chunkinvertedindexPath.toString());
     File chunkdebug = new File(chunkdebugPath.toString());
@@ -183,9 +168,9 @@ public class IndexBuilder {
     if (debugmode) {
       dbgw = new BufferedWriter(new FileWriter(chunkdebug));
     }
-    int currentByte = 0;
+    long currentByte = 0;
     for (Entry<String, ArrayList<int[]>> en : chunk.entrySet()) {
-      int startByte = currentByte;
+      long startByte = currentByte;
       int plLength = en.getValue().size();
       vcw.write(String.format("%s\t%d-%d\n", en.getKey(), startByte, plLength));
       if (debugmode) {
@@ -246,10 +231,9 @@ public class IndexBuilder {
    */
   private File[] getFiles(String base, int left, int right) throws IOException {
     String extension = (base.equals("debug")) ? "dbg" : "dat";
-    Path[] resultPaths = new Path[] {
-        Paths.get(Constants.OUTPUT_DIR.toString(), String.format("%s_%d.%s", base, left, extension)),
-        Paths.get(Constants.OUTPUT_DIR.toString(), String.format("%s_%d.%s", base, right, extension)),
-        Paths.get(Constants.OUTPUT_DIR.toString(), String.format("%s_tmp.%s", base, extension)) };
+    Path[] resultPaths = new Path[] { Paths.get(SELECTED_PATH, String.format("%s_%d.%s", base, left, extension)),
+        Paths.get(SELECTED_PATH, String.format("%s_%d.%s", base, right, extension)),
+        Paths.get(SELECTED_PATH, String.format("%s_tmp.%s", base, extension)) };
     File[] resultFiles = new File[3];
     for (int i = 0; i < 3; i++) {
       // if left and right files aren't both available the merging is impossible
@@ -289,10 +273,16 @@ public class IndexBuilder {
    * 
    * @param componentsPart the string in the format "%d-%d"
    * @return the int[] where [0] is the docid and [1] is the plLength
+   * @throws IOException
    */
-  private int[] getComponents(String componentsPart) {
+  private Object[] getComponents(String componentsPart) throws IOException {
     String[] scomponents = componentsPart.split("-");
-    return new int[] { Integer.parseInt(scomponents[0]), Integer.parseInt(scomponents[1]) };
+    try {
+      return new Object[] { Long.parseLong(scomponents[0]), Integer.parseInt(scomponents[1]) };
+    } catch (NumberFormatException nfe) {
+      throw new IOException(
+          "Failed to merge because of bad formatted data: " + componentsPart + "\n" + nfe.getMessage());
+    }
   }
 
   /**
@@ -305,7 +295,7 @@ public class IndexBuilder {
    */
   private File getNewFileName(String base, int newindex) throws IOException {
     String extension = base.equals("debug") ? "dbg" : "dat";
-    Path newPath = Paths.get(Constants.OUTPUT_DIR.toString(), String.format("%s_%d.%s", base, newindex, extension));
+    Path newPath = Paths.get(SELECTED_PATH, String.format("%s_%d.%s", base, newindex, extension));
     File newFilename = new File(newPath.toString());
     if (newFilename.exists())
       throw new IOException(
@@ -342,15 +332,16 @@ public class IndexBuilder {
    * @throws IOException
    */
   private void loadFileinto(BufferedReader lexicon, FileInputStream invindex, BufferedWriter newLexicon,
-      FileOutputStream newInvindex, BufferedWriter newDebug, int currentByte, String currentTerm) throws IOException {
+      FileOutputStream newInvindex, BufferedWriter newDebug, long currentByte, String currentTerm) throws IOException {
     do {
       String[] parts = currentTerm.split("\t");
       String term = parts[0];
-      int[] components = getComponents(parts[1]);
-      byte[] pl = invindex.readNBytes(2 * Integer.BYTES * components[1]);
-      newLexicon.write(String.format("%s\t%d-%d\n", term, components[0], components[1]));
+      Object[] components = getComponents(parts[1]);
+      byte[] pl = invindex.readNBytes(2 * Integer.BYTES * ((int) components[1]));
+      newLexicon.write(String.format("%s\t%d-%d\n", term, currentByte, ((int) components[1])));
       if (debugmode) {
-        newDebug.write(String.format("%s\t%d -> %s\n", term, components[1], byteBufferToString(ByteBuffer.wrap(pl))));
+        newDebug.write(
+            String.format("%s\t%d -> %s\n", term, ((int) components[1]), byteBufferToString(ByteBuffer.wrap(pl))));
       }
       newInvindex.write(pl);
       currentByte += pl.length;
@@ -370,16 +361,16 @@ public class IndexBuilder {
     if (li == ri) {
       // just rename the three needed files into *.newindex
       ConsoleUX.DebugLog("Renaming chunks _" + li + " to _" + newindex);
-      Path oldPath = Paths.get(Constants.OUTPUT_DIR.toString(), String.format("inverted_index_%d.dat", li));
-      Path newPath = Paths.get(Constants.OUTPUT_DIR.toString(), String.format("inverted_index_%d.dat", newindex));
+      Path oldPath = Paths.get(SELECTED_PATH, String.format("inverted_index_%d.dat", li));
+      Path newPath = Paths.get(SELECTED_PATH, String.format("inverted_index_%d.dat", newindex));
       rename(oldPath, newPath);
       if (debugmode) {
-        oldPath = Paths.get(Constants.OUTPUT_DIR.toString(), String.format("debug_%d.dbg", li));
-        newPath = Paths.get(Constants.OUTPUT_DIR.toString(), String.format("debug_%d.dbg", newindex));
+        oldPath = Paths.get(SELECTED_PATH, String.format("debug_%d.dbg", li));
+        newPath = Paths.get(SELECTED_PATH, String.format("debug_%d.dbg", newindex));
         rename(oldPath, newPath);
       }
-      oldPath = Paths.get(Constants.OUTPUT_DIR.toString(), String.format("lexicon_%d.dat", li));
-      newPath = Paths.get(Constants.OUTPUT_DIR.toString(), String.format("lexicon_%d.dat", newindex));
+      oldPath = Paths.get(SELECTED_PATH, String.format("lexicon_%d.dat", li));
+      newPath = Paths.get(SELECTED_PATH, String.format("lexicon_%d.dat", newindex));
       rename(oldPath, newPath);
     } else {
       ConsoleUX.DebugLog("Merging chunks _" + li + " and _" + ri + " into _" + newindex);
@@ -396,7 +387,7 @@ public class IndexBuilder {
       FileOutputStream newInvindex = new FileOutputStream(iiFiles[2]);
       String leftTerm = lexicons[0].readLine();
       String rightTerm = lexicons[1].readLine();
-      int currentByte = 0;
+      long currentByte = 0;
       while (leftTerm != null || rightTerm != null) {
         if (leftTerm == null) {
           // only rightTerms remain
@@ -411,19 +402,20 @@ public class IndexBuilder {
         // in the middle of the parsing
         String[] parts = leftTerm.split("\t");
         String lterm = parts[0];
-        int[] lcomponents = getComponents(parts[1]);
+        Object[] lcomponents = getComponents(parts[1]);
         parts = rightTerm.split("\t");
         String rterm = parts[0];
-        int[] rcomponents = getComponents(parts[1]);
+        Object[] rcomponents = getComponents(parts[1]);
         if (lterm.equals(rterm)) {
           // concatenate right's posting to left's posting
-          byte[] bl = invindexes[0].readNBytes(lcomponents[1] * 2 * Integer.BYTES);
-          byte[] br = invindexes[1].readNBytes(rcomponents[1] * 2 * Integer.BYTES);
+          byte[] bl = invindexes[0].readNBytes(((int) lcomponents[1]) * 2 * Integer.BYTES); // [1] should remain an integer
+          byte[] br = invindexes[1].readNBytes(((int) rcomponents[1]) * 2 * Integer.BYTES);
           byte[] result = ByteBuffer.allocate(bl.length + br.length).put(bl).put(br).array();
-          newLexicon.write(String.format("%s\t%d-%d\n", lterm, currentByte, lcomponents[1] + rcomponents[1]));
+          newLexicon
+              .write(String.format("%s\t%d-%d\n", lterm, currentByte, ((int) lcomponents[1]) + ((int) rcomponents[1])));
           newInvindex.write(result);
           if (debugmode) {
-            debugWriter.write(String.format("%s\t%d -> %s\n", lterm, lcomponents[1] + rcomponents[1],
+            debugWriter.write(String.format("%s\t%d -> %s\n", lterm, ((int) lcomponents[1]) + ((int) rcomponents[1]),
                 byteBufferToString(ByteBuffer.wrap(result))));
           }
           leftTerm = lexicons[0].readLine();
@@ -431,23 +423,23 @@ public class IndexBuilder {
           currentByte += result.length;
         } else if (lterm.compareTo(rterm) < 0) {
           // lterm comes before rterm
-          byte[] bl = invindexes[0].readNBytes(lcomponents[1] * 2 * Integer.BYTES);
-          newLexicon.write(String.format("%s\t%d-%d\n", lterm, currentByte, lcomponents[1]));
+          byte[] bl = invindexes[0].readNBytes(((int) lcomponents[1]) * 2 * Integer.BYTES);
+          newLexicon.write(String.format("%s\t%d-%d\n", lterm, currentByte, ((int) lcomponents[1])));
           newInvindex.write(bl);
           if (debugmode) {
-            debugWriter
-                .write(String.format("%s\t%d -> %s\n", lterm, lcomponents[1], byteBufferToString(ByteBuffer.wrap(bl))));
+            debugWriter.write(String.format("%s\t%d -> %s\n", lterm, ((int) lcomponents[1]),
+                byteBufferToString(ByteBuffer.wrap(bl))));
           }
           leftTerm = lexicons[0].readLine();
           currentByte += bl.length;
         } else {
           // rterm comes before rterm
-          byte[] br = invindexes[1].readNBytes(rcomponents[1] * 2 * Integer.BYTES);
-          newLexicon.write(String.format("%s\t%d-%d\n", rterm, currentByte, rcomponents[1]));
+          byte[] br = invindexes[1].readNBytes(((int) rcomponents[1]) * 2 * Integer.BYTES);
+          newLexicon.write(String.format("%s\t%d-%d\n", rterm, currentByte, ((int) rcomponents[1])));
           newInvindex.write(br);
           if (debugmode) {
-            debugWriter
-                .write(String.format("%s\t%d -> %s\n", rterm, rcomponents[1], byteBufferToString(ByteBuffer.wrap(br))));
+            debugWriter.write(String.format("%s\t%d -> %s\n", rterm, ((int) rcomponents[1]),
+                byteBufferToString(ByteBuffer.wrap(br))));
           }
           rightTerm = lexicons[1].readLine();
           currentByte += br.length;
@@ -466,15 +458,15 @@ public class IndexBuilder {
 
       // delete old files, rename tmp file into _newindex
       //  CLEANING INDEX FILES
-      iiFiles[0].delete();
-      iiFiles[1].delete();
+      while (!iiFiles[0].delete());
+      while (!iiFiles[1].delete());
       //  CLEANING LEXICON FILES
-      lsFiles[0].delete();
-      lsFiles[1].delete();
+      while (!lsFiles[0].delete());
+      while (!lsFiles[1].delete());
       //  CLEANING DEBUG FILES
       if (debugmode) {
-        dbgFiles[0].delete();
-        dbgFiles[1].delete();
+        while (!dbgFiles[0].delete());
+        while (!dbgFiles[1].delete());
       }
 
       // RENAIMING OF THE FILES TO AVOID ISSUES WITH DELETE IT HAS BEEN SEPARATED FROM THE CLEANING STEPS
