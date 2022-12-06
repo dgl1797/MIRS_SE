@@ -5,11 +5,13 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Scanner;
 import java.util.zip.GZIPInputStream;
+
+import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
+import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream;
 
 import unipi.mirs.components.IndexBuilder;
 import unipi.mirs.graphics.ConsoleUX;
@@ -19,7 +21,6 @@ import unipi.mirs.utilities.Constants;
 public class IndexManager {
 
     private static String inputFile = Paths.get(Constants.INPUT_DIR.toString(), "collection.tsv").toString();
-    private static boolean readCompressed = false;
     private static boolean stopnostem_mode = false;
     private static final Scanner stdin = new Scanner(System.in);
 
@@ -65,7 +66,8 @@ public class IndexManager {
         File inputDir = new File(Constants.INPUT_DIR.toString());
 
         String[] files = Arrays.asList(inputDir.listFiles()).stream().filter((f) -> f.isFile())
-                .filter((f) -> f.toString().matches(".*\\.gz$") || f.toString().matches(".*\\.tsv$"))
+                .filter((f) -> f.toString().matches(".*\\.gz$") || f.toString().matches(".*\\.tsv$")
+                        || f.toString().matches(".*\\.tar$"))
                 .map(f -> f.toString()).toArray(String[]::new);
 
         if (Arrays.asList(files).size() == 0) {
@@ -77,38 +79,42 @@ public class IndexManager {
         }
         Menu filesMenu = new Menu(stdin, files);
         inputFile = files[filesMenu.printMenu()];
-        if (inputFile.matches(".*\\.gz$"))
-            readCompressed = true;
     }
 
     /**
      * Builds the inverted index by first creating the sorted chunks of the collection, then merging them in a
      * merge-sort-like fashion; it will allow the creation in debug mode which will create debug files containing the
      * core informations of each chunk of files
+     * 
      */
     private static void buildIndex() {
-        BufferedReader inreader = null;
         InputStreamReader isr = null;
-        FileInputStream fis = null;
+        BufferedReader inreader = null;
         try {
-            fis = new FileInputStream(inputFile);
-            if (readCompressed) {
-                GZIPInputStream zippedInputStream = new GZIPInputStream(fis);
-                isr = new InputStreamReader(zippedInputStream, StandardCharsets.UTF_8);
+            if (inputFile.matches(".*\\.tar\\.gz")) {
+                //.tar.gz archieve
+                TarArchiveInputStream tais = new TarArchiveInputStream(
+                        new GzipCompressorInputStream(new FileInputStream(new File(inputFile))));
+                tais.getNextEntry();
+                isr = new InputStreamReader(tais);
+            } else if (inputFile.matches(".*\\.gz")) {
+                //.gz
+                GZIPInputStream gis = new GZIPInputStream(new FileInputStream(new File(inputFile)));
+                isr = new InputStreamReader(gis);
+            } else if (inputFile.matches(".*\\.tar")) {
+                // .tar
+                TarArchiveInputStream tais = new TarArchiveInputStream(new FileInputStream(new File(inputFile)));
+                tais.getNextEntry();
+                isr = new InputStreamReader(tais);
             } else {
-                isr = new InputStreamReader(fis, StandardCharsets.UTF_8);
+                isr = new InputStreamReader(new FileInputStream(new File(inputFile)));
             }
             inreader = new BufferedReader(isr);
+            while (!inreader.ready());
             ConsoleUX.DebugLog(ConsoleUX.CLS + "Processing File...");
             String document;
-            boolean isfirst = true;
             IndexBuilder vb = new IndexBuilder(stdin, stopnostem_mode);
             while ((document = inreader.readLine()) != null) {
-                if (isfirst) {
-                    String docbody = document.split("\t")[1];
-                    document = "0\t" + docbody;
-                    isfirst = false;
-                }
                 vb.addDocument(document);
             }
             vb.write_chunk();
@@ -162,9 +168,6 @@ public class IndexManager {
             try {
                 if(isr != null){
                     isr.close();
-                }
-                if(fis != null){
-                    fis.close();
                 }
                 if(inreader != null){
                     inreader.close();
