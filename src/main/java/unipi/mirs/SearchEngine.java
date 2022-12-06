@@ -20,12 +20,13 @@ public class SearchEngine {
   private static final Scanner stdin = new Scanner(System.in);
   private static boolean isConjunctive = false;
   private static boolean isTFIDF = true;
+  private static boolean stopnostem = false;
 
   private static HashSet<String> stopwords = null;
   private static Vocabulary lexicon = null;
   private static DocTable doctable = null;
 
-  private static boolean handleCommand(String command) {
+  private static boolean handleCommand(String command) throws IOException {
     if (command.toLowerCase().equals("exit"))
       return true;
 
@@ -36,9 +37,13 @@ public class SearchEngine {
     } else if (command.toLowerCase().equals("file")) {
       ConsoleUX.DebugLog("Work in progress");
       ConsoleUX.pause(true, stdin);
+    }else if (command.toLowerCase().equals("stopnostem")) {
+      stopnostem=!stopnostem;
+      loadDataStructures();
     } else if (command.toLowerCase().equals("help")) {
       ConsoleUX.SuccessLog(ConsoleUX.CLS + "/help/ - prints the guide for all possible commands");
       ConsoleUX.SuccessLog("/mode/ - changes query mode(conjunctive - disjunctive)");
+      ConsoleUX.SuccessLog("/stopnostem/ - performs queries including stopwords and without the stemming process");
       ConsoleUX.SuccessLog("/score/ - changes scoring function to be used for ranked retrieval(TFIDF - BM25)");
       ConsoleUX.SuccessLog("/file/ - performs queries taking them from a selected file");
       ConsoleUX.SuccessLog("/exit/ - stops the interactive search");
@@ -47,6 +52,7 @@ public class SearchEngine {
       ConsoleUX.ErrorLog(ConsoleUX.CLS + "Unknown Command:");
       ConsoleUX.SuccessLog("/help/ - prints the guide for all possible commands");
       ConsoleUX.SuccessLog("/mode/ - changes query mode(conjunctive - disjunctive)");
+      ConsoleUX.SuccessLog("/stopnostem/ - performs queries including stopwords and without the stemming process");
       ConsoleUX.SuccessLog("/score/ - changes scoring function to be used for ranked retrieval(TFIDF - BM25)");
       ConsoleUX.SuccessLog("/file/ - performs queries taking them from a selected file");
       ConsoleUX.SuccessLog("/exit/ - stops the interactive search");
@@ -54,7 +60,6 @@ public class SearchEngine {
     }
     return false;
   }
-
   private static TreeSet<Entry<String, Double>> search(String query) throws IOException {
     TreeSet<Entry<String, Double>> top20 = new TreeSet<>(new Comparator<Entry<String, Double>>() {
       @Override
@@ -76,7 +81,11 @@ public class SearchEngine {
     int oldMax = -1;
     for (String w : query.split(" ")) {
       if (!stopwords.contains(w)) {
-        w = TextNormalizationFunctions.ps.stem(w);
+        if(!stopnostem)
+        {
+          w = TextNormalizationFunctions.ps.stem(w);
+
+        }
         // if even one term is not present in the whole collection, returns empty list
         if (!lexicon.vocabulary.containsKey(w))
           return top20;
@@ -177,7 +186,11 @@ public class SearchEngine {
 
     for (String w : query.split(" ")) {
       if (!stopwords.contains(w)) {
-        w = TextNormalizationFunctions.ps.stem(w);
+        if(!stopnostem)
+        {
+          w = TextNormalizationFunctions.ps.stem(w);
+
+        }
         // ignoring the terms that are not present in the lexicon
         if (!lexicon.vocabulary.containsKey(w))
           continue;
@@ -236,19 +249,31 @@ public class SearchEngine {
     return top20;
   }
 
+  public static boolean loadDataStructures() throws IOException
+  {
+    ConsoleUX.DebugLog(ConsoleUX.CLS + "Loading lexicon and doctable..");
+    lexicon = null;
+    doctable = null;
+    lexicon = new Vocabulary(stopnostem);
+    lexicon.loadVocabulary();
+    doctable = new DocTable(stopnostem);
+    doctable.loadDocTable();
+    return true;
+  }
   public static void main(String[] args) throws IOException {
     try {
       // setup
       ConsoleUX.DebugLog(ConsoleUX.CLS + "Loading...");
-      lexicon = new Vocabulary();
-      lexicon.loadVocabulary();
-      doctable = new DocTable();
-      doctable.loadDocTable();
-      stopwords = TextNormalizationFunctions.load_stopwords();
+      loadDataStructures();
+      if(stopnostem)
+      {
+        stopwords = TextNormalizationFunctions.load_stopwords();
+      }
       // guide
       TreeSet<Entry<String, Double>> top20 = new TreeSet<>();
       ConsoleUX.SuccessLog(ConsoleUX.CLS + "Commands:\n/help/ - prints the guide for all possible commands");
       ConsoleUX.SuccessLog("/mode/ - changes query mode(conjunctive - disjunctive)");
+      ConsoleUX.SuccessLog("/stopnostem/ - performs queries including stopwords and without the stemming process");
       ConsoleUX.SuccessLog("/score/ - changes scoring function to be used for ranked retrieval(TFIDF - BM25)");
       ConsoleUX.SuccessLog("/file/ - performs queries taking them from a selected file");
       ConsoleUX.SuccessLog("/exit/ - quits the search engine");
@@ -257,10 +282,12 @@ public class SearchEngine {
         ConsoleUX.SuccessLog("Search", "");
         ConsoleUX.DebugLog("[" + (isConjunctive ? "c" : "d") + "]", "");
         ConsoleUX.DebugLog("[" + (isTFIDF ? "tfidf" : "bm25") + "]", "");
+        
+        ConsoleUX.DebugLog("[sw" + (stopnostem ? "+]" : "-]") + "[stem"+ (stopnostem ? "-]" : "+]"));
         ConsoleUX.SuccessLog(": ", "");
         String query = stdin.nextLine();
         // query system commands
-        if (query.matches("^\\/(help|mode|score|file|exit)\\/$")) {
+        if (query.matches("^\\/(help|mode|stopnostem|score|file|exit)\\/$")) {
           if (handleCommand(query.replaceAll("\\/", ""))) {
             // termination if user enters /exit/ in the search field
             break;

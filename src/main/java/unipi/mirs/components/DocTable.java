@@ -16,8 +16,8 @@ public class DocTable {
   public HashMap<Integer, Object[]> doctable = new HashMap<>();
   public int ndocs = 0;
   public double avgDocLen = 0;
-
-  public DocTable() {}
+  public boolean stopnostem;
+  public DocTable(boolean stopnostem_mode) {this.stopnostem = stopnostem_mode;}
 
   private Object[] getComponents(String line) {
     String[] parts = line.split("-");
@@ -25,7 +25,8 @@ public class DocTable {
   }
 
   public void loadDocTable() throws IOException {
-    Path doctablePath = Paths.get(Constants.OUTPUT_DIR.toString(), "doctable.dat");
+    String OUTPUT_LOCATION = stopnostem ? Constants.STOPNOSTEM_OUTPUT_DIR.toString() : Constants.OUTPUT_DIR.toString();
+    Path doctablePath = Paths.get(OUTPUT_LOCATION, "doctable.dat");
     File doctableFile = new File(doctablePath.toString());
     if (!doctableFile.exists()) {
       throw new IOException("Unable to retrieve the vocabulary from the index's file system");
