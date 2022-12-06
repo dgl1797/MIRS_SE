@@ -2,13 +2,13 @@ package unipi.mirs;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import java.io.InputStreamReader;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Scanner;
+import java.util.zip.GZIPInputStream;
 
 import unipi.mirs.components.IndexBuilder;
 import unipi.mirs.graphics.ConsoleUX;
@@ -86,11 +86,19 @@ public class IndexManager {
      * core informations of each chunk of files
      */
     private static void buildIndex() {
-        if (readCompressed) {
-
-        }
-        ConsoleUX.DebugLog(ConsoleUX.CLS + "Processing File...");
-        try (BufferedReader inreader = Files.newBufferedReader(Path.of(inputFile), StandardCharsets.UTF_8)) {
+        BufferedReader inreader = null;
+        InputStreamReader isr = null;
+        FileInputStream fis = null;
+        try {
+            fis = new FileInputStream(inputFile);
+            if (readCompressed) {
+                GZIPInputStream zippedInputStream = new GZIPInputStream(fis);
+                isr = new InputStreamReader(zippedInputStream);
+            } else {
+                isr = new InputStreamReader(fis);
+            }
+            inreader = new BufferedReader(isr);
+            ConsoleUX.DebugLog(ConsoleUX.CLS + "Processing File...");
             String document;
             IndexBuilder vb = new IndexBuilder(stdin, stopnostem_mode);
             while ((document = inreader.readLine()) != null) {
@@ -143,6 +151,21 @@ public class IndexManager {
         } catch (IOException e) {
             ConsoleUX.ErrorLog("Unable to create index for " + inputFile + ":\n" + e.getMessage());
             ConsoleUX.pause(false, stdin);
+        } finally {
+            try {
+                if(isr != null){
+                    isr.close();
+                }
+                if(fis != null){
+                    fis.close();
+                }
+                if(inreader != null){
+                    inreader.close();
+                }
+            } catch (IOException e) {
+                ConsoleUX.ErrorLog("Unable to close file:\n" + e.getMessage());
+                ConsoleUX.pause(false, stdin);
+            }
         }
     }
 
