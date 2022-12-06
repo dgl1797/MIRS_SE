@@ -6,7 +6,6 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Scanner;
-import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.Map.Entry;
 
@@ -20,12 +19,14 @@ public class SearchEngine {
   private static final Scanner stdin = new Scanner(System.in);
   private static boolean isConjunctive = false;
   private static boolean isTFIDF = true;
+  private static boolean stopnostem = false;
+  private static int parsedDocs = 0;
 
-  private static HashSet<String> stopwords = null;
+  private static HashSet<String> stopwords = new HashSet<String>();
   private static Vocabulary lexicon = null;
   private static DocTable doctable = null;
 
-  private static boolean handleCommand(String command) {
+  private static boolean handleCommand(String command) throws IOException {
     if (command.toLowerCase().equals("exit"))
       return true;
 
@@ -36,9 +37,13 @@ public class SearchEngine {
     } else if (command.toLowerCase().equals("file")) {
       ConsoleUX.DebugLog("Work in progress");
       ConsoleUX.pause(true, stdin);
+    } else if (command.toLowerCase().equals("filter")) {
+      stopnostem = !stopnostem;
+      loadDataStructures();
     } else if (command.toLowerCase().equals("help")) {
       ConsoleUX.SuccessLog(ConsoleUX.CLS + "/help/ - prints the guide for all possible commands");
       ConsoleUX.SuccessLog("/mode/ - changes query mode(conjunctive - disjunctive)");
+      ConsoleUX.SuccessLog("/filter/ - performs queries including stopwords and without the stemming process");
       ConsoleUX.SuccessLog("/score/ - changes scoring function to be used for ranked retrieval(TFIDF - BM25)");
       ConsoleUX.SuccessLog("/file/ - performs queries taking them from a selected file");
       ConsoleUX.SuccessLog("/exit/ - stops the interactive search");
@@ -47,6 +52,7 @@ public class SearchEngine {
       ConsoleUX.ErrorLog(ConsoleUX.CLS + "Unknown Command:");
       ConsoleUX.SuccessLog("/help/ - prints the guide for all possible commands");
       ConsoleUX.SuccessLog("/mode/ - changes query mode(conjunctive - disjunctive)");
+      ConsoleUX.SuccessLog("/filter/ - performs queries including stopwords and without the stemming process");
       ConsoleUX.SuccessLog("/score/ - changes scoring function to be used for ranked retrieval(TFIDF - BM25)");
       ConsoleUX.SuccessLog("/file/ - performs queries taking them from a selected file");
       ConsoleUX.SuccessLog("/exit/ - stops the interactive search");
@@ -55,6 +61,13 @@ public class SearchEngine {
     return false;
   }
 
+  /**
+   * conjunctive query
+   * 
+   * @param query the query
+   * @return the top 20 documents where all the query terms appear
+   * @throws IOException
+   */
   private static TreeSet<Entry<String, Double>> search(String query) throws IOException {
     TreeSet<Entry<String, Double>> top20 = new TreeSet<>(new Comparator<Entry<String, Double>>() {
       @Override
@@ -76,7 +89,7 @@ public class SearchEngine {
     int oldMax = -1;
     for (String w : query.split(" ")) {
       if (!stopwords.contains(w)) {
-        w = TextNormalizationFunctions.ps.stem(w);
+        w = stopnostem ? w : TextNormalizationFunctions.ps.stem(w);
         // if even one term is not present in the whole collection, returns empty list
         if (!lexicon.vocabulary.containsKey(w))
           return top20;
@@ -84,8 +97,8 @@ public class SearchEngine {
         if (pls.containsKey(w)) {
           pls.get(w)[1] = ((int) pls.get(w)[1]) + 1;
         } else {
-          pls.put(w,
-              new Object[] { PostingList.openList(lexicon.vocabulary.get(w)[0], lexicon.vocabulary.get(w)[1]), 1 });
+          pls.put(w, new Object[] {
+              PostingList.openList(lexicon.vocabulary.get(w)[0], lexicon.vocabulary.get(w)[1], stopnostem), 1 });
           // check if the opened docid is greater than maxdocid
           int currentdocid = ((PostingList) pls.get(w)[0]).getDocID();
           maxdocid = (currentdocid > maxdocid) ? currentdocid : maxdocid;
@@ -151,11 +164,18 @@ public class SearchEngine {
       if (isover)
         break;
     }
-
+    parsedDocs = maxdocid;
     return top20;
   }
 
-  //overload
+  /**
+   * disjunctive search
+   * 
+   * @param query         the query for which to search
+   * @param isDisjunctive overloading parameter
+   * @return the top 20 results where at least a query term appears
+   * @throws IOException
+   */
   private static TreeSet<Entry<String, Double>> search(String query, boolean isDisjunctive) throws IOException {
     TreeSet<Entry<String, Double>> top20 = new TreeSet<>(new Comparator<Entry<String, Double>>() {
       @Override
@@ -173,20 +193,23 @@ public class SearchEngine {
     });
     query = TextNormalizationFunctions.cleanText(query);
     HashMap<String, Object[]> pls = new HashMap<>();
-    TreeMap<Integer, Double> partialScores = new TreeMap<>();
 
+    // heap with the docids actually targeted by the terms' posting lists
+    TreeSet<Integer> docids = new TreeSet<>();
+    int lastdocid = 0;
+
+    // open the posting lists
     for (String w : query.split(" ")) {
       if (!stopwords.contains(w)) {
-        w = TextNormalizationFunctions.ps.stem(w);
-        // ignoring the terms that are not present in the lexicon
+        w = stopnostem ? w : TextNormalizationFunctions.ps.stem(w);
         if (!lexicon.vocabulary.containsKey(w))
           continue;
-
-        if (!pls.containsKey(w)) {
-          pls.put(w,
-              new Object[] { PostingList.openList(lexicon.vocabulary.get(w)[0], lexicon.vocabulary.get(w)[1]), 1 });
-        } else {
+        if (pls.containsKey(w)) {
           pls.get(w)[1] = ((int) pls.get(w)[1]) + 1;
+        } else {
+          pls.put(w, new Object[] {
+              PostingList.openList(lexicon.vocabulary.get(w)[0], lexicon.vocabulary.get(w)[1], stopnostem), 1 });
+          docids.add(((PostingList) pls.get(w)[0]).getDocID());
         }
       }
     }
@@ -194,73 +217,81 @@ public class SearchEngine {
     if (pls.size() == 0)
       return top20;
 
+    // traverses all the postings DAAT
     int completedPostingLists = 0;
     while (completedPostingLists < pls.size()) {
-      // evaluate the current docid's score updating the partialscore of the docids
+      double docscore = 0;
+      int currentdocid = docids.first();
       for (String w : pls.keySet()) {
-        // if postinglist is over skip it
         if (((PostingList) pls.get(w)[0]).isover())
           continue;
+        int listdocid = ((PostingList) pls.get(w)[0]).getDocID();
+        if (currentdocid == listdocid) {
+          docscore += isTFIDF ? ((PostingList) pls.get(w)[0]).tfidf(doctable.ndocs, ((int) pls.get(w)[1]))
+              : ((PostingList) pls.get(w)[0]).score(doctable.ndocs, ((int) pls.get(w)[1]),
+                  ((int) doctable.doctable.get(listdocid)[1]), doctable.avgDocLen);
 
-        int currentdocid = ((PostingList) pls.get(w)[0]).getDocID();
-        double currentscore = isTFIDF ? ((PostingList) pls.get(w)[0]).tfidf(doctable.ndocs, ((int) pls.get(w)[1]))
-            : ((PostingList) pls.get(w)[0]).score(doctable.ndocs, ((int) pls.get(w)[1]),
-                ((int) doctable.doctable.get(currentdocid)[1]), doctable.avgDocLen);
-        // update partial score
-        if (!partialScores.containsKey(currentdocid)) {
-          partialScores.put(currentdocid, currentscore);
-        } else {
-          partialScores.put(currentdocid, partialScores.get(currentdocid) + currentscore);
-        }
-        // move the postinglist to the next iteration
-        if (!((PostingList) pls.get(w)[0]).next()) {
-          // posting list is over
-          completedPostingLists += 1;
+          if (!((PostingList) pls.get(w)[0]).next()) {
+            completedPostingLists += 1;
+          } else {
+            docids.add(((PostingList) pls.get(w)[0]).getDocID());
+          }
         }
       }
-      // remove the mindocid which is the first element of the partialscore heap sorted by docid and add it to top20
-      Entry<Integer, Double> polledEntry = partialScores.pollFirstEntry();
       if (top20.size() == 20) {
-        if (top20.last().getValue() < polledEntry.getValue()) {
-          // if the lowest in top20 is lower than the polled docid score we remove the last and add the polled one
+        if (top20.last().getValue() < docscore) {
           top20.pollLast();
-          top20.add(new AbstractMap.SimpleEntry<String, Double>((String) doctable.doctable.get(polledEntry.getKey())[0],
-              polledEntry.getValue()));
+          top20.add(
+              new AbstractMap.SimpleEntry<String, Double>((String) doctable.doctable.get(currentdocid)[0], docscore));
         }
       } else {
-        // simply adds the polled element
-        top20.add(new AbstractMap.SimpleEntry<String, Double>((String) doctable.doctable.get(polledEntry.getKey())[0],
-            polledEntry.getValue()));
+        top20.add(
+            new AbstractMap.SimpleEntry<String, Double>((String) doctable.doctable.get(currentdocid)[0], docscore));
       }
+      lastdocid = docids.pollFirst();
     }
+    parsedDocs = lastdocid;
     return top20;
+  }
+
+  public static boolean loadDataStructures() throws IOException {
+    ConsoleUX.DebugLog(ConsoleUX.CLS + "Loading lexicon and doctable..");
+    lexicon = null;
+    doctable = null;
+    stopwords = stopnostem ? new HashSet<>() : TextNormalizationFunctions.load_stopwords();
+    lexicon = new Vocabulary(stopnostem);
+    lexicon.loadVocabulary();
+    doctable = new DocTable(stopnostem);
+    doctable.loadDocTable();
+    return true;
   }
 
   public static void main(String[] args) throws IOException {
     try {
       // setup
-      ConsoleUX.DebugLog(ConsoleUX.CLS + "Loading...");
-      lexicon = new Vocabulary();
-      lexicon.loadVocabulary();
-      doctable = new DocTable();
-      doctable.loadDocTable();
-      stopwords = TextNormalizationFunctions.load_stopwords();
-      // guide
+      loadDataStructures();
       TreeSet<Entry<String, Double>> top20 = new TreeSet<>();
+
+      // guide
       ConsoleUX.SuccessLog(ConsoleUX.CLS + "Commands:\n/help/ - prints the guide for all possible commands");
       ConsoleUX.SuccessLog("/mode/ - changes query mode(conjunctive - disjunctive)");
+      ConsoleUX.SuccessLog("/filter/ - enables/disables stopword and stemming filtering");
       ConsoleUX.SuccessLog("/score/ - changes scoring function to be used for ranked retrieval(TFIDF - BM25)");
       ConsoleUX.SuccessLog("/file/ - performs queries taking them from a selected file");
       ConsoleUX.SuccessLog("/exit/ - quits the search engine");
+      ConsoleUX.pause(true, stdin);
+
       // interactive querying
       while (true) {
+        ConsoleUX.DebugLog("Stopwords and Stemming filtering: ", "");
+        ConsoleUX.SuccessLog(stopnostem ? "disabled" : "enabled");
         ConsoleUX.SuccessLog("Search", "");
         ConsoleUX.DebugLog("[" + (isConjunctive ? "c" : "d") + "]", "");
         ConsoleUX.DebugLog("[" + (isTFIDF ? "tfidf" : "bm25") + "]", "");
         ConsoleUX.SuccessLog(": ", "");
         String query = stdin.nextLine();
         // query system commands
-        if (query.matches("^\\/(help|mode|score|file|exit)\\/$")) {
+        if (query.matches("^\\/(help|mode|filter|score|file|exit)\\/$")) {
           if (handleCommand(query.replaceAll("\\/", ""))) {
             // termination if user enters /exit/ in the search field
             break;
@@ -277,7 +308,7 @@ public class SearchEngine {
 
         // documents printing
         int position = 0;
-        ConsoleUX.DebugLog("Parsed " + doctable.ndocs + " documents in " + delta + "ms:");
+        ConsoleUX.DebugLog("Parsed " + parsedDocs + " documents in " + delta + "ms:");
         for (Entry<String, Double> doc : top20) {
           ConsoleUX.SuccessLog((++position) + ".\t" + doc.getKey() + " - " + doc.getValue());
         }

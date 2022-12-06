@@ -2,13 +2,14 @@ package unipi.mirs;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Scanner;
+import java.util.zip.GZIPInputStream;
 
 import unipi.mirs.components.IndexBuilder;
 import unipi.mirs.graphics.ConsoleUX;
@@ -19,7 +20,38 @@ public class IndexManager {
 
     private static String inputFile = Paths.get(Constants.INPUT_DIR.toString(), "collection.tsv").toString();
     private static boolean readCompressed = false;
+    private static boolean stopnostem_mode = false;
     private static final Scanner stdin = new Scanner(System.in);
+
+    private static void createFileSystem() {
+        String pathString = Constants.WORKING_DIR.toString();
+        File fileSystemCreator = new File(Paths.get(pathString, "data").toString());
+        if (!fileSystemCreator.exists()) {
+            fileSystemCreator.mkdir();
+        }
+        String datafolder = fileSystemCreator.toString();
+        fileSystemCreator = new File(Paths.get(datafolder, "input").toString());
+        if (!fileSystemCreator.exists()) {
+            fileSystemCreator.mkdir();
+        }
+        fileSystemCreator = new File(Paths.get(fileSystemCreator.toString(), "queries").toString());
+        if (!fileSystemCreator.exists()) {
+            fileSystemCreator.mkdir();
+        }
+        fileSystemCreator = new File(Paths.get(datafolder, "output").toString());
+        if (!fileSystemCreator.exists()) {
+            fileSystemCreator.mkdir();
+        }
+        String outputfolder = fileSystemCreator.toString();
+        fileSystemCreator = new File(Paths.get(outputfolder, "distributed").toString());
+        if (!fileSystemCreator.exists()) {
+            fileSystemCreator.mkdir();
+        }
+        fileSystemCreator = new File(Paths.get(outputfolder, "stopnostem").toString());
+        if (!fileSystemCreator.exists()) {
+            fileSystemCreator.mkdir();
+        }
+    }
 
     /**
      * Allows the user to select a new file as collection of the search engine, the collection has to be in .tsv format
@@ -39,7 +71,9 @@ public class IndexManager {
         if (Arrays.asList(files).size() == 0) {
             ConsoleUX.ErrorLog(
                     "No files found, make sure to import a .tsv or .gz file inside " + Constants.INPUT_DIR + " folder");
+            ConsoleUX.pause(true, stdin);
             inputFile = "";
+            return;
         }
         Menu filesMenu = new Menu(stdin, files);
         inputFile = files[filesMenu.printMenu()];
@@ -53,20 +87,32 @@ public class IndexManager {
      * core informations of each chunk of files
      */
     private static void buildIndex() {
-        if (readCompressed) {
-
-        }
-        ConsoleUX.DebugLog(ConsoleUX.CLS + "Processing File...");
-        try (BufferedReader inreader = Files.newBufferedReader(Path.of(inputFile), StandardCharsets.UTF_8)) {
+        BufferedReader inreader = null;
+        InputStreamReader isr = null;
+        FileInputStream fis = null;
+        try {
+            fis = new FileInputStream(inputFile);
+            if (readCompressed) {
+                GZIPInputStream zippedInputStream = new GZIPInputStream(fis);
+                isr = new InputStreamReader(zippedInputStream, StandardCharsets.UTF_8);
+            } else {
+                isr = new InputStreamReader(fis, StandardCharsets.UTF_8);
+            }
+            inreader = new BufferedReader(isr);
+            ConsoleUX.DebugLog(ConsoleUX.CLS + "Processing File...");
             String document;
-            IndexBuilder vb = new IndexBuilder(stdin);
+            boolean isfirst = true;
+            IndexBuilder vb = new IndexBuilder(stdin, stopnostem_mode);
             while ((document = inreader.readLine()) != null) {
+                if (isfirst) {
+                    String docbody = document.split("\t")[1];
+                    document = "0\t" + docbody;
+                    isfirst = false;
+                }
                 vb.addDocument(document);
             }
             vb.write_chunk();
             vb.closeDocTable();
-            ConsoleUX.SuccessLog("Index Builded succesfully.");
-            ConsoleUX.pause(true, stdin);
             int nchunks = vb.getNChunks();
             ConsoleUX.DebugLog("Merging " + nchunks + " Chunks...");
             boolean remainingChunk = false;
@@ -89,19 +135,20 @@ public class IndexManager {
                 remainingChunk = ((windowsize%2) != 0);
             }
             // removing _0 from last produced chunks
-            File lastchunk = new File(Paths.get(Constants.OUTPUT_DIR.toString(), "inverted_index_0.dat").toString());
+            String OUTPUT_LOCATION = stopnostem_mode ? Constants.STOPNOSTEM_OUTPUT_DIR.toString() : Constants.OUTPUT_DIR.toString();
+            File lastchunk = new File(Paths.get(OUTPUT_LOCATION, "inverted_index_0.dat").toString());
             if(!lastchunk.exists()){
                 ConsoleUX.ErrorLog("Unexpected error in the merging phase: "+lastchunk.toString()+" should exist but doesn't");
             }
-            File finalName = new File(Paths.get(Constants.OUTPUT_DIR.toString(),"inverted_index.dat").toString());
+            File finalName = new File(Paths.get(OUTPUT_LOCATION,"inverted_index.dat").toString());
             if(finalName.exists()) finalName.delete();
             while(!lastchunk.renameTo(finalName));
 
-            lastchunk = new File(Paths.get(Constants.OUTPUT_DIR.toString(), "lexicon_0.dat").toString());
+            lastchunk = new File(Paths.get(OUTPUT_LOCATION, "lexicon_0.dat").toString());
             if(!lastchunk.exists()){
                 ConsoleUX.ErrorLog("Unexpected error in the merging phase: "+lastchunk.toString()+" should exist but doesn't");
             }
-            finalName = new File(Paths.get(Constants.OUTPUT_DIR.toString(), "lexicon.dat").toString());
+            finalName = new File(Paths.get(OUTPUT_LOCATION, "lexicon.dat").toString());
             if(finalName.exists()) finalName.delete();
             while(!lastchunk.renameTo(finalName));
             // endof merge
@@ -111,6 +158,21 @@ public class IndexManager {
         } catch (IOException e) {
             ConsoleUX.ErrorLog("Unable to create index for " + inputFile + ":\n" + e.getMessage());
             ConsoleUX.pause(false, stdin);
+        } finally {
+            try {
+                if(isr != null){
+                    isr.close();
+                }
+                if(fis != null){
+                    fis.close();
+                }
+                if(inreader != null){
+                    inreader.close();
+                }
+            } catch (IOException e) {
+                ConsoleUX.ErrorLog("Unable to close file:\n" + e.getMessage());
+                ConsoleUX.pause(false, stdin);
+            }
         }
     }
 
@@ -118,7 +180,8 @@ public class IndexManager {
      * Completely clean the data/output directory from files
      */
     private static void cleanOutput(){
-        File outputfolder = new File(Constants.OUTPUT_DIR.toString());
+        String OUTPUT_LOCATION = stopnostem_mode ? Constants.STOPNOSTEM_OUTPUT_DIR.toString() : Constants.OUTPUT_DIR.toString();
+        File outputfolder = new File(OUTPUT_LOCATION);
         //@formatter:on
         File[] files = Arrays.asList(outputfolder.listFiles()).stream().filter((f) -> f.isFile()).toArray(File[]::new);
         for (File f : files) {
@@ -129,13 +192,14 @@ public class IndexManager {
     }
 
     public static void main(String[] args) throws IOException {
+        createFileSystem();
         // Save index in a file, compressed index in another one to avoid re-building index every time
         Menu menu = new Menu(stdin, "Change Input File", "Build Index", "Compress Inverted Index", "Clean output",
-                "Exit");
+                "Change Mode", "Exit");
         int opt = 0;
-        while ((opt = menu.printMenu(
-                ConsoleUX.FG_BLUE + ConsoleUX.BOLD + "Selected File: " + inputFile + ConsoleUX.RESET)) != menu
-                        .exitMenuOption()) {
+        while ((opt = menu.printMenu(ConsoleUX.FG_BLUE + ConsoleUX.BOLD + "Selected File: " + inputFile
+                + "\nSelected Modes: Stopwords[" + (stopnostem_mode ? "enabled] - " : "disabled] - ") + "Stemming["
+                + (stopnostem_mode ? "disabled]" : "enabled]") + ConsoleUX.RESET)) != menu.exitMenuOption()) {
             if (opt == 0) {
                 changeInputFile();
             } else if (opt == 1) {
@@ -144,6 +208,8 @@ public class IndexManager {
                 // Compression of the inverted index
             } else if (opt == 3) {
                 cleanOutput();
+            } else if (opt == 4) {
+                stopnostem_mode = !stopnostem_mode;
             }
         }
     }

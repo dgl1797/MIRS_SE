@@ -46,12 +46,13 @@ public class PostingList {
     this.postingList = null;
   }
 
-  public static PostingList openList(int startPosition, int plLength) throws IOException {
+  public static PostingList openList(long startPosition, long plLength, boolean stopnostem) throws IOException {
     PostingList postinglist = null;
-    int bytelength = plLength * 2 * Integer.BYTES;
+    int bytelength = (int) (plLength) * 2 * Integer.BYTES;
     byte[] pl = new byte[bytelength];
-    String invertedIndexStr = String.format("inverted_index.dat");
-    Path invertedIndexPath = Paths.get(Constants.OUTPUT_DIR.toString(), invertedIndexStr);
+    String invertedIndexStr = "inverted_index.dat";
+    String OUTPUT_LOCATION = stopnostem ? Constants.STOPNOSTEM_OUTPUT_DIR.toString() : Constants.OUTPUT_DIR.toString();
+    Path invertedIndexPath = Paths.get(OUTPUT_LOCATION, invertedIndexStr);
     try (FileInputStream fileInvInd = new FileInputStream(invertedIndexPath.toString())) {
 
       fileInvInd.skip(startPosition);
@@ -59,7 +60,7 @@ public class PostingList {
 
       postinglist = new PostingList();
       postinglist.postingList = ByteBuffer.wrap(pl).asIntBuffer();
-      postinglist.totalLength = plLength;
+      postinglist.totalLength = (int) plLength;
 
       //garbage collector, dovrebbe?
       invertedIndexPath = null;
@@ -133,7 +134,7 @@ public class PostingList {
 
   public double tfidf(int ndocs, int noccurences) {
     int tf = getFreq();
-    return noccurences * (1 + (Math.log10(tf))) * Math.log10(ndocs / this.totalLength);
+    return noccurences * (1 + (Math.log10(tf))) * (Math.log10((double) ndocs / (double) this.totalLength));
   }
 
 }
