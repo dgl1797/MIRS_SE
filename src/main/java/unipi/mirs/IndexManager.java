@@ -3,18 +3,15 @@ package unipi.mirs;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Scanner;
+import java.util.zip.GZIPInputStream;
 
-import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream;
-import org.apache.commons.compress.utils.IOUtils;
 
 import unipi.mirs.components.IndexBuilder;
 import unipi.mirs.graphics.ConsoleUX;
@@ -24,7 +21,6 @@ import unipi.mirs.utilities.Constants;
 public class IndexManager {
 
     private static String inputFile = Paths.get(Constants.INPUT_DIR.toString(), "collection.tsv").toString();
-    private static boolean readCompressed = false;
     private static boolean stopnostem_mode = false;
     private static final Scanner stdin = new Scanner(System.in);
 
@@ -83,60 +79,6 @@ public class IndexManager {
         }
         Menu filesMenu = new Menu(stdin, files);
         inputFile = files[filesMenu.printMenu()];
-        if (inputFile.matches(".*\\.gz$") || inputFile.matches(".*\\.tar$"))
-            readCompressed = true;
-    }
-
-    private static void dearchive(boolean istargz) throws IOException {
-        if (istargz) {
-            TarArchiveInputStream tais = new TarArchiveInputStream(
-                    new GzipCompressorInputStream(new FileInputStream(new File(inputFile))));
-            File outfilename = Paths.get(Constants.INPUT_DIR.toString(), "decompressed_collection.tsv").toFile();
-            if (outfilename.exists()) {
-                outfilename.delete();
-            }
-            outfilename.createNewFile();
-            FileOutputStream fos = new FileOutputStream(outfilename);
-            TarArchiveEntry entry;
-            while ((entry = tais.getNextTarEntry()) != null) {
-                if (entry.isFile()) {
-                    tais.transferTo(fos);
-                }
-            }
-            fos.close();
-            tais.close();
-        } else {
-            TarArchiveInputStream tais = new TarArchiveInputStream(new FileInputStream(new File(inputFile)));
-            File outfile = Paths.get(Constants.INPUT_DIR.toString(), "decompressed_collection.tsv").toFile();
-            if (outfile.exists()) {
-                outfile.delete();
-            }
-            outfile.createNewFile();
-            FileOutputStream fos = new FileOutputStream(outfile);
-            TarArchiveEntry entry;
-            while ((entry = tais.getNextTarEntry()) != null) {
-                if (entry.isFile()) {
-                    IOUtils.copy(tais, fos);
-                }
-            }
-            tais.close();
-            fos.close();
-        }
-        inputFile = Paths.get(Constants.INPUT_DIR.toString(), "decompressed_collection.tsv").toString();
-    }
-
-    private static void dearchive_gzip() throws IOException {
-        GzipCompressorInputStream gzip = new GzipCompressorInputStream(new FileInputStream(new File(inputFile)));
-        File outfilename = Paths.get(Constants.INPUT_DIR.toString(), "decompressed_collection.tsv").toFile();
-        if (outfilename.exists()) {
-            outfilename.delete();
-        }
-        outfilename.createNewFile();
-        FileOutputStream fos = new FileOutputStream(outfilename);
-        gzip.transferTo(fos);
-        gzip.close();
-        fos.close();
-        inputFile = Paths.get(Constants.INPUT_DIR.toString(), "decompressed_collection.tsv").toString();
     }
 
     /**
@@ -149,20 +91,26 @@ public class IndexManager {
         InputStreamReader isr = null;
         BufferedReader inreader = null;
         try {
-            if (readCompressed) {
-                if (inputFile.matches(".*\\.tar\\.gz")) {
-                    //.tar.gz
-                    dearchive(true);
-                } else if (inputFile.matches(".*\\.gz")) {
-                    //.gz
-                    dearchive_gzip();
-                } else {
-                    // .tar
-                    dearchive(false);
-                }
+            if (inputFile.matches(".*\\.tar\\.gz")) {
+                //.tar.gz archieve
+                TarArchiveInputStream tais = new TarArchiveInputStream(
+                        new GzipCompressorInputStream(new FileInputStream(new File(inputFile))));
+                tais.getNextEntry();
+                isr = new InputStreamReader(tais);
+            } else if (inputFile.matches(".*\\.gz")) {
+                //.gz
+                GZIPInputStream gis = new GZIPInputStream(new FileInputStream(new File(inputFile)));
+                isr = new InputStreamReader(gis);
+            } else if (inputFile.matches(".*\\.tar")) {
+                // .tar
+                TarArchiveInputStream tais = new TarArchiveInputStream(new FileInputStream(new File(inputFile)));
+                tais.getNextEntry();
+                isr = new InputStreamReader(tais);
+            } else {
+                isr = new InputStreamReader(new FileInputStream(new File(inputFile)));
             }
-            isr = new InputStreamReader(new FileInputStream(new File(inputFile)), StandardCharsets.UTF_8);
             inreader = new BufferedReader(isr);
+            while (!inreader.ready());
             ConsoleUX.DebugLog(ConsoleUX.CLS + "Processing File...");
             String document;
             IndexBuilder vb = new IndexBuilder(stdin, stopnostem_mode);
