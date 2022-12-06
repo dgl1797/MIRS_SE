@@ -198,11 +198,11 @@ public class IndexManager {
         createFileSystem();
         // Save index in a file, compressed index in another one to avoid re-building index every time
         Menu menu = new Menu(stdin, "Change Input File", "Build Index", "Compress Inverted Index", "Clean output",
-                "Change Mode", "Exit");
+                "Enable/Disable Filtering", "Exit");
         int opt = 0;
         while ((opt = menu.printMenu(ConsoleUX.FG_BLUE + ConsoleUX.BOLD + "Selected File: " + inputFile
-                + "\nSelected Modes: Stopwords[" + (stopnostem_mode ? "enabled] - " : "disabled] - ") + "Stemming["
-                + (stopnostem_mode ? "disabled]" : "enabled]") + ConsoleUX.RESET)) != menu.exitMenuOption()) {
+                + "\nStopwords and Stemming filtering: " + ConsoleUX.FG_GREEN + ConsoleUX.BOLD
+                + (stopnostem_mode ? "disabled" : "enabled") + ConsoleUX.RESET)) != menu.exitMenuOption()) {
             if (opt == 0) {
                 changeInputFile();
             } else if (opt == 1) {
