@@ -3,13 +3,18 @@ package unipi.mirs;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Scanner;
-import java.util.zip.GZIPInputStream;
+
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
+import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
+import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream;
+import org.apache.commons.compress.utils.IOUtils;
 
 import unipi.mirs.components.IndexBuilder;
 import unipi.mirs.graphics.ConsoleUX;
@@ -65,7 +70,8 @@ public class IndexManager {
         File inputDir = new File(Constants.INPUT_DIR.toString());
 
         String[] files = Arrays.asList(inputDir.listFiles()).stream().filter((f) -> f.isFile())
-                .filter((f) -> f.toString().matches(".*\\.gz$") || f.toString().matches(".*\\.tsv$"))
+                .filter((f) -> f.toString().matches(".*\\.gz$") || f.toString().matches(".*\\.tsv$")
+                        || f.toString().matches(".*\\.tar$"))
                 .map(f -> f.toString()).toArray(String[]::new);
 
         if (Arrays.asList(files).size() == 0) {
@@ -77,38 +83,90 @@ public class IndexManager {
         }
         Menu filesMenu = new Menu(stdin, files);
         inputFile = files[filesMenu.printMenu()];
-        if (inputFile.matches(".*\\.gz$"))
+        if (inputFile.matches(".*\\.gz$") || inputFile.matches(".*\\.tar$"))
             readCompressed = true;
+    }
+
+    private static void dearchive(boolean istargz) throws IOException {
+        if (istargz) {
+            TarArchiveInputStream tais = new TarArchiveInputStream(
+                    new GzipCompressorInputStream(new FileInputStream(new File(inputFile))));
+            File outfilename = Paths.get(Constants.INPUT_DIR.toString(), "decompressed_collection.tsv").toFile();
+            if (outfilename.exists()) {
+                outfilename.delete();
+            }
+            outfilename.createNewFile();
+            FileOutputStream fos = new FileOutputStream(outfilename);
+            TarArchiveEntry entry;
+            while ((entry = tais.getNextTarEntry()) != null) {
+                if (entry.isFile()) {
+                    tais.transferTo(fos);
+                }
+            }
+            fos.close();
+            tais.close();
+        } else {
+            TarArchiveInputStream tais = new TarArchiveInputStream(new FileInputStream(new File(inputFile)));
+            File outfile = Paths.get(Constants.INPUT_DIR.toString(), "decompressed_collection.tsv").toFile();
+            if (outfile.exists()) {
+                outfile.delete();
+            }
+            outfile.createNewFile();
+            FileOutputStream fos = new FileOutputStream(outfile);
+            TarArchiveEntry entry;
+            while ((entry = tais.getNextTarEntry()) != null) {
+                if (entry.isFile()) {
+                    IOUtils.copy(tais, fos);
+                }
+            }
+            tais.close();
+            fos.close();
+        }
+        inputFile = Paths.get(Constants.INPUT_DIR.toString(), "decompressed_collection.tsv").toString();
+    }
+
+    private static void dearchive_gzip() throws IOException {
+        GzipCompressorInputStream gzip = new GzipCompressorInputStream(new FileInputStream(new File(inputFile)));
+        File outfilename = Paths.get(Constants.INPUT_DIR.toString(), "decompressed_collection.tsv").toFile();
+        if (outfilename.exists()) {
+            outfilename.delete();
+        }
+        outfilename.createNewFile();
+        FileOutputStream fos = new FileOutputStream(outfilename);
+        gzip.transferTo(fos);
+        gzip.close();
+        fos.close();
+        inputFile = Paths.get(Constants.INPUT_DIR.toString(), "decompressed_collection.tsv").toString();
     }
 
     /**
      * Builds the inverted index by first creating the sorted chunks of the collection, then merging them in a
      * merge-sort-like fashion; it will allow the creation in debug mode which will create debug files containing the
      * core informations of each chunk of files
+     * 
      */
     private static void buildIndex() {
-        BufferedReader inreader = null;
         InputStreamReader isr = null;
-        FileInputStream fis = null;
+        BufferedReader inreader = null;
         try {
-            fis = new FileInputStream(inputFile);
             if (readCompressed) {
-                GZIPInputStream zippedInputStream = new GZIPInputStream(fis);
-                isr = new InputStreamReader(zippedInputStream, StandardCharsets.UTF_8);
-            } else {
-                isr = new InputStreamReader(fis, StandardCharsets.UTF_8);
+                if (inputFile.matches(".*\\.tar\\.gz")) {
+                    //.tar.gz
+                    dearchive(true);
+                } else if (inputFile.matches(".*\\.gz")) {
+                    //.gz
+                    dearchive_gzip();
+                } else {
+                    // .tar
+                    dearchive(false);
+                }
             }
+            isr = new InputStreamReader(new FileInputStream(new File(inputFile)), StandardCharsets.UTF_8);
             inreader = new BufferedReader(isr);
             ConsoleUX.DebugLog(ConsoleUX.CLS + "Processing File...");
             String document;
-            boolean isfirst = true;
             IndexBuilder vb = new IndexBuilder(stdin, stopnostem_mode);
             while ((document = inreader.readLine()) != null) {
-                if (isfirst) {
-                    String docbody = document.split("\t")[1];
-                    document = "0\t" + docbody;
-                    isfirst = false;
-                }
                 vb.addDocument(document);
             }
             vb.write_chunk();
@@ -162,9 +220,6 @@ public class IndexManager {
             try {
                 if(isr != null){
                     isr.close();
-                }
-                if(fis != null){
-                    fis.close();
                 }
                 if(inreader != null){
                     inreader.close();
