@@ -22,7 +22,7 @@ public class SearchEngine {
   private static boolean isTFIDF = true;
   private static boolean stopnostem = false;
 
-  private static HashSet<String> stopwords = null;
+  private static HashSet<String> stopwords = new HashSet<String>();
   private static Vocabulary lexicon = null;
   private static DocTable doctable = null;
 
@@ -94,7 +94,7 @@ public class SearchEngine {
           pls.get(w)[1] = ((int) pls.get(w)[1]) + 1;
         } else {
           pls.put(w,
-              new Object[] { PostingList.openList(lexicon.vocabulary.get(w)[0], lexicon.vocabulary.get(w)[1]), 1 });
+              new Object[] { PostingList.openList(lexicon.vocabulary.get(w)[0], lexicon.vocabulary.get(w)[1],stopnostem), 1 });
           // check if the opened docid is greater than maxdocid
           int currentdocid = ((PostingList) pls.get(w)[0]).getDocID();
           maxdocid = (currentdocid > maxdocid) ? currentdocid : maxdocid;
@@ -189,7 +189,6 @@ public class SearchEngine {
         if(!stopnostem)
         {
           w = TextNormalizationFunctions.ps.stem(w);
-
         }
         // ignoring the terms that are not present in the lexicon
         if (!lexicon.vocabulary.containsKey(w))
@@ -197,7 +196,7 @@ public class SearchEngine {
 
         if (!pls.containsKey(w)) {
           pls.put(w,
-              new Object[] { PostingList.openList(lexicon.vocabulary.get(w)[0], lexicon.vocabulary.get(w)[1]), 1 });
+              new Object[] { PostingList.openList(lexicon.vocabulary.get(w)[0], lexicon.vocabulary.get(w)[1],stopnostem), 1 });
         } else {
           pls.get(w)[1] = ((int) pls.get(w)[1]) + 1;
         }

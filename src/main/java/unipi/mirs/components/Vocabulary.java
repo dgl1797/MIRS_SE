@@ -12,16 +12,16 @@ import java.util.HashMap;
 import unipi.mirs.utilities.Constants;
 
 public class Vocabulary {
-  public HashMap<String, Integer[]> vocabulary = new HashMap<String, Integer[]>();
+  public HashMap<String, Long[]> vocabulary = new HashMap<String, Long[]>();
   public boolean stopnostem;
   //the cell [0] is the docid , into the cell [1] there is the length
   public Vocabulary(boolean stopnostem_mode) {
      this.stopnostem = stopnostem_mode;
     }
 
-  private Integer[] getComponents(String line) {
+  private Long[] getComponents(String line) {
     String[] parts = line.split("-");
-    return new Integer[] { Integer.parseInt(parts[0]), Integer.parseInt(parts[1]) };
+    return new Long[] { Long.parseLong(parts[0]), Long.parseLong(parts[1]) };
   }
 
   public void loadVocabulary() throws IOException {
@@ -38,6 +38,12 @@ public class Vocabulary {
       if (vocabulary.containsKey(parts[0])) {
         throw new IOException("Malformed Vocabulary");
       }
+      
+      /* 
+      if(getComponents(parts[1])[1]>=1000000)
+      {
+        System.out.println(parts[0] + " - " + String.format("%,d", getComponents(parts[1])[1]));;
+      }*/
       vocabulary.put(parts[0], getComponents(parts[1]));
     }
   }

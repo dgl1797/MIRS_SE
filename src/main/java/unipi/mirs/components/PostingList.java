@@ -14,8 +14,7 @@ public class PostingList {
 
   private final int postingSize = 2;
   private IntBuffer postingList = null;
-  public int totalLength = 0;
-
+  public Long totalLength = 0L;
   private PostingList() {}
 
   public int getPointer() {
@@ -46,12 +45,13 @@ public class PostingList {
     this.postingList = null;
   }
 
-  public static PostingList openList(int startPosition, int plLength) throws IOException {
+  public static PostingList openList(long startPosition, long plLength,boolean stopnostem) throws IOException {
     PostingList postinglist = null;
-    int bytelength = plLength * 2 * Integer.BYTES;
+    int bytelength = (int)(plLength) * 2 * Integer.BYTES;
     byte[] pl = new byte[bytelength];
     String invertedIndexStr = String.format("inverted_index.dat");
-    Path invertedIndexPath = Paths.get(Constants.OUTPUT_DIR.toString(), invertedIndexStr);
+    String OUTPUT_LOCATION = stopnostem ? Constants.STOPNOSTEM_OUTPUT_DIR.toString() : Constants.OUTPUT_DIR.toString();
+    Path invertedIndexPath = Paths.get(OUTPUT_LOCATION, invertedIndexStr);
     try (FileInputStream fileInvInd = new FileInputStream(invertedIndexPath.toString())) {
 
       fileInvInd.skip(startPosition);
