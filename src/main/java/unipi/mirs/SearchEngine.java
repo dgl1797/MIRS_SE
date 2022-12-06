@@ -37,8 +37,8 @@ public class SearchEngine {
     } else if (command.toLowerCase().equals("file")) {
       ConsoleUX.DebugLog("Work in progress");
       ConsoleUX.pause(true, stdin);
-    }else if (command.toLowerCase().equals("stopnostem")) {
-      stopnostem=!stopnostem;
+    } else if (command.toLowerCase().equals("stopnostem")) {
+      stopnostem = !stopnostem;
       loadDataStructures();
     } else if (command.toLowerCase().equals("help")) {
       ConsoleUX.SuccessLog(ConsoleUX.CLS + "/help/ - prints the guide for all possible commands");
@@ -60,6 +60,7 @@ public class SearchEngine {
     }
     return false;
   }
+
   private static TreeSet<Entry<String, Double>> search(String query) throws IOException {
     TreeSet<Entry<String, Double>> top20 = new TreeSet<>(new Comparator<Entry<String, Double>>() {
       @Override
@@ -81,8 +82,7 @@ public class SearchEngine {
     int oldMax = -1;
     for (String w : query.split(" ")) {
       if (!stopwords.contains(w)) {
-        if(!stopnostem)
-        {
+        if (!stopnostem) {
           w = TextNormalizationFunctions.ps.stem(w);
 
         }
@@ -93,8 +93,8 @@ public class SearchEngine {
         if (pls.containsKey(w)) {
           pls.get(w)[1] = ((int) pls.get(w)[1]) + 1;
         } else {
-          pls.put(w,
-              new Object[] { PostingList.openList(lexicon.vocabulary.get(w)[0], lexicon.vocabulary.get(w)[1],stopnostem), 1 });
+          pls.put(w, new Object[] {
+              PostingList.openList(lexicon.vocabulary.get(w)[0], lexicon.vocabulary.get(w)[1], stopnostem), 1 });
           // check if the opened docid is greater than maxdocid
           int currentdocid = ((PostingList) pls.get(w)[0]).getDocID();
           maxdocid = (currentdocid > maxdocid) ? currentdocid : maxdocid;
@@ -182,74 +182,72 @@ public class SearchEngine {
     });
     query = TextNormalizationFunctions.cleanText(query);
     HashMap<String, Object[]> pls = new HashMap<>();
-    TreeMap<Integer, Double> partialScores = new TreeMap<>();
+
+    int minDocID = -1;
 
     for (String w : query.split(" ")) {
-      if (!stopwords.contains(w)) {
-        if(!stopnostem)
-        {
-          w = TextNormalizationFunctions.ps.stem(w);
+      if (!pls.containsKey(w)) {
+        pls.put(w, new Object[] {
+            PostingList.openList(lexicon.vocabulary.get(w)[0], lexicon.vocabulary.get(w)[1], stopnostem),1});
+        int currDocID = ((PostingList) pls.get(w)[0]).getDocID();
+        if (minDocID == -1) {
+          minDocID = currDocID;
         }
-        // ignoring the terms that are not present in the lexicon
-        if (!lexicon.vocabulary.containsKey(w))
-          continue;
+        minDocID = currDocID < minDocID ? currDocID : minDocID;
 
-        if (!pls.containsKey(w)) {
-          pls.put(w,
-              new Object[] { PostingList.openList(lexicon.vocabulary.get(w)[0], lexicon.vocabulary.get(w)[1],stopnostem), 1 });
-        } else {
-          pls.get(w)[1] = ((int) pls.get(w)[1]) + 1;
-        }
-      }
-    }
-
-    if (pls.size() == 0)
-      return top20;
-
-    int completedPostingLists = 0;
-    while (completedPostingLists < pls.size()) {
-      // evaluate the current docid's score updating the partialscore of the docids
-      for (String w : pls.keySet()) {
-        // if postinglist is over skip it
-        if (((PostingList) pls.get(w)[0]).isover())
-          continue;
-
-        int currentdocid = ((PostingList) pls.get(w)[0]).getDocID();
-        double currentscore = isTFIDF ? ((PostingList) pls.get(w)[0]).tfidf(doctable.ndocs, ((int) pls.get(w)[1]))
-            : ((PostingList) pls.get(w)[0]).score(doctable.ndocs, ((int) pls.get(w)[1]),
-                ((int) doctable.doctable.get(currentdocid)[1]), doctable.avgDocLen);
-        // update partial score
-        if (!partialScores.containsKey(currentdocid)) {
-          partialScores.put(currentdocid, currentscore);
-        } else {
-          partialScores.put(currentdocid, partialScores.get(currentdocid) + currentscore);
-        }
-        // move the postinglist to the next iteration
-        if (!((PostingList) pls.get(w)[0]).next()) {
-          // posting list is over
-          completedPostingLists += 1;
-        }
-      }
-      // remove the mindocid which is the first element of the partialscore heap sorted by docid and add it to top20
-      Entry<Integer, Double> polledEntry = partialScores.pollFirstEntry();
-      if (top20.size() == 20) {
-        if (top20.last().getValue() < polledEntry.getValue()) {
-          // if the lowest in top20 is lower than the polled docid score we remove the last and add the polled one
-          top20.pollLast();
-          top20.add(new AbstractMap.SimpleEntry<String, Double>((String) doctable.doctable.get(polledEntry.getKey())[0],
-              polledEntry.getValue()));
-        }
       } else {
-        // simply adds the polled element
-        top20.add(new AbstractMap.SimpleEntry<String, Double>((String) doctable.doctable.get(polledEntry.getKey())[0],
-            polledEntry.getValue()));
+        pls.get(w)[1] = ((int) pls.get(w)[1]) + 1;
       }
+
+
+      int nIteratedPostings = 0;
+      while (nIteratedPostings<pls.keySet().size()) {
+        double total = 0;
+        for (String pl : pls.keySet()) {
+          if(((PostingList) pls.get(pl)[0]).isover())
+          {
+            continue;
+          }
+          int currDocID = ((PostingList) pls.get(pl)[0]).getDocID();
+          if (currDocID == minDocID) {
+              double currentscore = isTFIDF ? ((PostingList) pls.get(pl)[0]).tfidf(doctable.ndocs, ((int) pls.get(pl)[1]))
+                  : ((PostingList) pls.get(pl)[0]).score(doctable.ndocs, ((int) pls.get(pl)[1]),
+                      ((int) doctable.doctable.get(minDocID)[1]), doctable.avgDocLen);
+              total += currentscore;
+              if(!((PostingList) pls.get(pl)[0]).next())
+              {
+                nIteratedPostings+=1;
+              }
+              else
+              {
+                currDocID = ((PostingList) pls.get(w)[0]).getDocID();
+                minDocID = currDocID < minDocID ? currDocID : minDocID;
+              }
+
+          }
+
+        }
+        if(top20.size() == 20)
+        {
+          if(top20.last().getValue()<total)
+          {
+            top20.pollLast();
+            top20.add(new AbstractMap.SimpleEntry<String, Double>((String) doctable.doctable.get(minDocID)[0], total));
+          
+          }
+          
+        }else
+        {
+          top20.add(new AbstractMap.SimpleEntry<String, Double>((String) doctable.doctable.get(minDocID)[0], total));
+        }
+
+      }
+
     }
     return top20;
   }
 
-  public static boolean loadDataStructures() throws IOException
-  {
+  public static boolean loadDataStructures() throws IOException {
     ConsoleUX.DebugLog(ConsoleUX.CLS + "Loading lexicon and doctable..");
     lexicon = null;
     doctable = null;
@@ -259,13 +257,13 @@ public class SearchEngine {
     doctable.loadDocTable();
     return true;
   }
+
   public static void main(String[] args) throws IOException {
     try {
       // setup
       ConsoleUX.DebugLog(ConsoleUX.CLS + "Loading...");
       loadDataStructures();
-      if(stopnostem)
-      {
+      if (stopnostem) {
         stopwords = TextNormalizationFunctions.load_stopwords();
       }
       // guide
@@ -281,8 +279,8 @@ public class SearchEngine {
         ConsoleUX.SuccessLog("Search", "");
         ConsoleUX.DebugLog("[" + (isConjunctive ? "c" : "d") + "]", "");
         ConsoleUX.DebugLog("[" + (isTFIDF ? "tfidf" : "bm25") + "]", "");
-        
-        ConsoleUX.DebugLog("[sw" + (stopnostem ? "+]" : "-]") + "[stem"+ (stopnostem ? "-]" : "+]"));
+
+        ConsoleUX.DebugLog("[sw" + (stopnostem ? "+]" : "-]") + "[stem" + (stopnostem ? "-]" : "+]"), "");
         ConsoleUX.SuccessLog(": ", "");
         String query = stdin.nextLine();
         // query system commands

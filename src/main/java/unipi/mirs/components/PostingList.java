@@ -133,7 +133,7 @@ public class PostingList {
 
   public double tfidf(int ndocs, int noccurences) {
     int tf = getFreq();
-    return noccurences * (1 + (Math.log10(tf))) * Math.log10(ndocs / this.totalLength);
+    return noccurences * (1 + (Math.log10(tf))) * (Math.log10((double)ndocs / (double)this.totalLength));
   }
 
 }
