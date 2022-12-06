@@ -86,6 +86,8 @@ public class IndexBuilder {
    */
   public void addDocument(String document) throws IOException {
     String[] parts = document.split("\t");
+    if (parts.length < 2)
+      return;
     String docno = parts[0];
     String docbody = parts[1];
     docbody = TextNormalizationFunctions.cleanText(docbody);

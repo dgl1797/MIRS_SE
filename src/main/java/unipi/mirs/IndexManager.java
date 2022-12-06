@@ -101,8 +101,14 @@ public class IndexManager {
             inreader = new BufferedReader(isr);
             ConsoleUX.DebugLog(ConsoleUX.CLS + "Processing File...");
             String document;
+            boolean isfirst = true;
             IndexBuilder vb = new IndexBuilder(stdin, stopnostem_mode);
             while ((document = inreader.readLine()) != null) {
+                if (isfirst) {
+                    String docbody = document.split("\t")[1];
+                    document = "0\t" + docbody;
+                    isfirst = false;
+                }
                 vb.addDocument(document);
             }
             vb.write_chunk();
