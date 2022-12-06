@@ -5,6 +5,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Scanner;
@@ -93,9 +94,9 @@ public class IndexManager {
             fis = new FileInputStream(inputFile);
             if (readCompressed) {
                 GZIPInputStream zippedInputStream = new GZIPInputStream(fis);
-                isr = new InputStreamReader(zippedInputStream);
+                isr = new InputStreamReader(zippedInputStream, StandardCharsets.UTF_8);
             } else {
-                isr = new InputStreamReader(fis);
+                isr = new InputStreamReader(fis, StandardCharsets.UTF_8);
             }
             inreader = new BufferedReader(isr);
             ConsoleUX.DebugLog(ConsoleUX.CLS + "Processing File...");
