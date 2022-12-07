@@ -163,8 +163,8 @@ public class IndexManager {
                 .map(f -> f.toString()).toArray(String[]::new);
 
         if (Arrays.asList(files).size() == 0) {
-            ConsoleUX.ErrorLog(
-                    "No files found, make sure to import a .tsv or .gz file inside " + Constants.INPUT_DIR + " folder");
+            ConsoleUX.ErrorLog("No files found, make sure to import a [.tsv; .gz; .tar.gz; .tar] file inside "
+                    + Constants.INPUT_DIR + " folder");
             ConsoleUX.pause(true, stdin);
             inputFile = "";
             return;
