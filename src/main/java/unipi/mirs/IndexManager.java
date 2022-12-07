@@ -31,8 +31,8 @@ public class IndexManager {
     private static String inputFile = Paths.get(Constants.INPUT_DIR.toString(), "collection.tsv").toString();
     private static boolean stopnostem_mode = false;
     private static final Scanner stdin = new Scanner(System.in);
-    private static DocTable dTable = null;
     private static IndexBuilder vb = null;
+    private static DocTable dTable = null;
 
     /**
      * Function creating the necessary folders for the application to work
@@ -183,21 +183,23 @@ public class IndexManager {
     private static void buildIndex() {
         InputStreamReader isr = null;
         BufferedReader inreader = null;
+        TarArchiveInputStream tais = null;
+        GZIPInputStream gis = null;
         long before = System.currentTimeMillis() / 1000;
         try {
             if (inputFile.matches(".*\\.tar\\.gz")) {
                 //.tar.gz archieve
-                TarArchiveInputStream tais = new TarArchiveInputStream(
+                tais = new TarArchiveInputStream(
                         new GzipCompressorInputStream(new FileInputStream(new File(inputFile))));
                 tais.getNextEntry();
                 isr = new InputStreamReader(tais);
             } else if (inputFile.matches(".*\\.gz")) {
                 //.gz
-                GZIPInputStream gis = new GZIPInputStream(new FileInputStream(new File(inputFile)));
+                gis = new GZIPInputStream(new FileInputStream(new File(inputFile)));
                 isr = new InputStreamReader(gis);
             } else if (inputFile.matches(".*\\.tar")) {
                 // .tar
-                TarArchiveInputStream tais = new TarArchiveInputStream(new FileInputStream(new File(inputFile)));
+                tais = new TarArchiveInputStream(new FileInputStream(new File(inputFile)));
                 tais.getNextEntry();
                 isr = new InputStreamReader(tais);
             } else {
@@ -269,6 +271,12 @@ public class IndexManager {
                 }
                 if(inreader != null){
                     inreader.close();
+                }
+                if(tais != null){
+                    tais.close();
+                }
+                if(gis != null){
+                    gis.close();
                 }
             } catch (IOException e) {
                 ConsoleUX.ErrorLog("Unable to close file:\n" + e.getMessage());
