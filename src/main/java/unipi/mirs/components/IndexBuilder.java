@@ -479,4 +479,9 @@ public class IndexBuilder {
       }
     }
   }
+
+  public void reset() {
+    this.chunk.clear();
+    this.stopwords.clear();
+  }
 }

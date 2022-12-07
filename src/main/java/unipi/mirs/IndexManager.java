@@ -1,10 +1,17 @@
 package unipi.mirs;
 
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.nio.ByteBuffer;
+import java.nio.IntBuffer;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Scanner;
@@ -13,6 +20,7 @@ import java.util.zip.GZIPInputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream;
 
+import unipi.mirs.components.DocTable;
 import unipi.mirs.components.IndexBuilder;
 import unipi.mirs.graphics.ConsoleUX;
 import unipi.mirs.graphics.Menu;
@@ -24,6 +32,9 @@ public class IndexManager {
     private static boolean stopnostem_mode = false;
     private static final Scanner stdin = new Scanner(System.in);
 
+    /**
+     * Function creating the necessary folders for the application to work
+     */
     private static void createFileSystem() {
         String pathString = Constants.WORKING_DIR.toString();
         File fileSystemCreator = new File(Paths.get(pathString, "data").toString());
@@ -52,6 +63,87 @@ public class IndexManager {
         if (!fileSystemCreator.exists()) {
             fileSystemCreator.mkdir();
         }
+    }
+
+    /**
+     * Computes the single term query over the collection to evaluate the terms upper bound then updates the inverted
+     * index and the lexicon to have the new information correctly updated
+     * 
+     * @throws IOException
+     */
+    private static void save_upper_bounds() throws IOException {
+        // LOAD DOCTABLE
+        DocTable dTable = new DocTable(stopnostem_mode);
+        Path workingDirectory = (!stopnostem_mode) ? Constants.OUTPUT_DIR : Constants.STOPNOSTEM_OUTPUT_DIR;
+        File lexicon = Paths.get(workingDirectory.toString(), "lexicon.dat").toFile();
+        File invindex = Paths.get(workingDirectory.toString(), "inverted_index.dat").toFile();
+        if (!lexicon.exists())
+            throw new IOException("Impossible to proceed, lexicon file doesn't exist");
+        if (!invindex.exists())
+            throw new IOException("Impossible to proceed, inverted index file doesn't exist");
+
+        // OPENING LEXICON AND INVERTED INDEX
+        BufferedReader lr = new BufferedReader(new FileReader(lexicon));
+        FileInputStream iir = new FileInputStream(invindex);
+
+        // CREATE TMPS FILES WHERE TO SAVE NEW INFOS
+        File tmp_lexicon = Paths.get(workingDirectory.toString(), "lexicon_tmp.dat").toFile();
+        File tmp_invindex = Paths.get(workingDirectory.toString(), "inverted_index_tmp.dat").toFile();
+        if (tmp_lexicon.exists())
+            while (!tmp_lexicon.delete());
+        if (tmp_invindex.exists())
+            while (!tmp_invindex.delete());
+        while (!tmp_lexicon.createNewFile());
+        while (!tmp_invindex.createNewFile());
+        BufferedWriter lw = new BufferedWriter(new FileWriter(tmp_lexicon));
+        FileOutputStream iiw = new FileOutputStream(tmp_invindex);
+
+        // WRITE NEW INFO INTO TMPS
+        String terminfos;
+        long currentByte = 0;
+        while ((terminfos = lr.readLine()) != null) {
+            // READ POSTING LIST INTO INT_BUFFER
+            String[] parts = terminfos.split("\t");
+            String term = parts[0];
+            int pllength = Integer.parseInt(parts[1].split("-")[1]);
+            ByteBuffer plBuffer = ByteBuffer.wrap(iir.readNBytes(pllength * 2 * Integer.BYTES));
+            IntBuffer pl = ByteBuffer.wrap(plBuffer.array()).asIntBuffer();
+
+            // EVAL UPPER BOUND
+            double upperbound = 0;
+            while (pl.position() < pl.capacity()) {
+                int doclen = ((int) dTable.doctable.get(pl.get())[1]);
+                int tf = pl.get();
+                upperbound += ((tf)
+                        / (Constants.K_ONE * ((1 - Constants.B) + (Constants.B * doclen / dTable.avgDocLen)) + tf)
+                        * Math.log10(dTable.ndocs / pllength));
+            }
+
+            // WRITE POSTING LIST INTO TMP FILE WITH UPPER BOUND AS INITIAL VALUE
+            ByteBuffer ubBuffer = ByteBuffer.allocate(Double.BYTES).putDouble(upperbound);
+            iiw.write(ubBuffer.array());
+            iiw.write(plBuffer.array());
+
+            // UPDATE TMP LEXICON
+            lw.write(String.format("%s\t%d-%d\n", term, currentByte, pllength));
+            currentByte += (Double.BYTES + (2 * Integer.BYTES * pllength));
+        }
+
+        // CLOSE STREAMS
+        lr.close();
+        iir.close();
+        lw.close();
+        iiw.close();
+
+        // DELETE OLD FILES
+        while (!lexicon.delete());
+        while (!invindex.delete());
+
+        // RENAME TMPS
+        File dst = Paths.get(workingDirectory.toString(), "lexicon.dat").toFile();
+        while (!tmp_lexicon.renameTo(dst));
+        dst = Paths.get(workingDirectory.toString(), "inverted_index.dat").toFile();
+        while (!tmp_invindex.renameTo(dst));
     }
 
     /**
@@ -85,11 +177,11 @@ public class IndexManager {
      * Builds the inverted index by first creating the sorted chunks of the collection, then merging them in a
      * merge-sort-like fashion; it will allow the creation in debug mode which will create debug files containing the
      * core informations of each chunk of files
-     * 
      */
     private static void buildIndex() {
         InputStreamReader isr = null;
         BufferedReader inreader = null;
+        long before = System.currentTimeMillis() / 1000;
         try {
             if (inputFile.matches(".*\\.tar\\.gz")) {
                 //.tar.gz archieve
@@ -157,10 +249,13 @@ public class IndexManager {
             finalName = new File(Paths.get(OUTPUT_LOCATION, "lexicon.dat").toString());
             if(finalName.exists()) finalName.delete();
             while(!lastchunk.renameTo(finalName));
+            ConsoleUX.SuccessLog("Merged " + nchunks + " Chunks");
+            vb.reset();
             // endof merge
 
-            ConsoleUX.SuccessLog("Merged " + nchunks + " Chunks");
-            ConsoleUX.pause(true, stdin);
+            ConsoleUX.DebugLog("Calculating Upper Bounds...");
+            save_upper_bounds();
+            ConsoleUX.SuccessLog("Index Building Completed. Took: "+((System.currentTimeMillis()/1000)-before)+"s");
         } catch (IOException e) {
             ConsoleUX.ErrorLog("Unable to create index for " + inputFile + ":\n" + e.getMessage());
             ConsoleUX.pause(false, stdin);
