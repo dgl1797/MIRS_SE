@@ -31,6 +31,8 @@ public class IndexManager {
     private static String inputFile = Paths.get(Constants.INPUT_DIR.toString(), "collection.tsv").toString();
     private static boolean stopnostem_mode = false;
     private static final Scanner stdin = new Scanner(System.in);
+    private static DocTable dTable = null;
+    private static IndexBuilder vb = null;
 
     /**
      * Function creating the necessary folders for the application to work
@@ -73,7 +75,7 @@ public class IndexManager {
      */
     private static void save_upper_bounds() throws IOException {
         // LOAD DOCTABLE
-        DocTable dTable = new DocTable(stopnostem_mode);
+        dTable = DocTable.loadDocTable(stopnostem_mode);
         Path workingDirectory = (!stopnostem_mode) ? Constants.OUTPUT_DIR : Constants.STOPNOSTEM_OUTPUT_DIR;
         File lexicon = Paths.get(workingDirectory.toString(), "lexicon.dat").toFile();
         File invindex = Paths.get(workingDirectory.toString(), "inverted_index.dat").toFile();
@@ -205,7 +207,7 @@ public class IndexManager {
             while (!inreader.ready());
             ConsoleUX.DebugLog(ConsoleUX.CLS + "Processing File...");
             String document;
-            IndexBuilder vb = new IndexBuilder(stdin, stopnostem_mode);
+            vb = new IndexBuilder(stdin, stopnostem_mode);
             while ((document = inreader.readLine()) != null) {
                 vb.addDocument(document);
             }
@@ -256,6 +258,7 @@ public class IndexManager {
             ConsoleUX.DebugLog("Calculating Upper Bounds...");
             save_upper_bounds();
             ConsoleUX.SuccessLog("Index Building Completed. Took: "+((System.currentTimeMillis()/1000)-before)+"s");
+            ConsoleUX.pause(true, stdin);
         } catch (IOException e) {
             ConsoleUX.ErrorLog("Unable to create index for " + inputFile + ":\n" + e.getMessage());
             ConsoleUX.pause(false, stdin);

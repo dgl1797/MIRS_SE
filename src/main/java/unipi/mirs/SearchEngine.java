@@ -256,13 +256,9 @@ public class SearchEngine {
 
   public static boolean loadDataStructures() throws IOException {
     ConsoleUX.DebugLog(ConsoleUX.CLS + "Loading lexicon and doctable..");
-    lexicon = null;
-    doctable = null;
     stopwords = stopnostem ? new HashSet<>() : TextNormalizationFunctions.load_stopwords();
-    lexicon = new Vocabulary(stopnostem);
-    lexicon.loadVocabulary();
-    doctable = new DocTable(stopnostem);
-    doctable.loadDocTable();
+    lexicon = Vocabulary.loadVocabulary(stopnostem);
+    doctable = DocTable.loadDocTable(stopnostem);
     return true;
   }
 
