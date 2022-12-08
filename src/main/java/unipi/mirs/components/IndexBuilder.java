@@ -91,6 +91,10 @@ public class IndexBuilder {
     if (currentDocID == 0)
       return;
 
+    ConsoleUX.DebugLog("Writing chunk " + currentChunkID + " to file...");
+    int wroteFiles = currentDocID;
+    int cid = currentChunkID;
+
     // FORMAT FILENAMES
     String chunkinvertedindexname = String.format("inverted_index_%d.dat", currentChunkID);
     String chunkdebugname = String.format("debug_%d.dbg", currentChunkID);
@@ -165,6 +169,7 @@ public class IndexBuilder {
     chunk.clear();
     currentChunkID++;
     currentDocID = 0;
+    ConsoleUX.DebugLog("Wrote " + (wroteFiles + cid * CHUNKSIZE) + " documents to file.");
   }
 
   /**
@@ -217,11 +222,7 @@ public class IndexBuilder {
     currentDocID++;
     if (currentDocID == CHUNKSIZE) {
       // reset and write of the chunk
-      ConsoleUX.DebugLog("Writing chunk " + currentChunkID + " to file...");
-      int wroteFiles = currentDocID;
-      int cid = currentChunkID;
       write_chunk();
-      ConsoleUX.DebugLog("Wrote " + (wroteFiles + cid * CHUNKSIZE) + " documents to file.");
     }
   }
 

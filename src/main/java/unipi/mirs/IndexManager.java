@@ -208,13 +208,11 @@ public class IndexManager {
       while ((document = inreader.readLine()) != null) {
         vb.addDocument(document);
       }
-      int nchunks = vb.getNChunks();
-      ConsoleUX.DebugLog("Writing chunk " + nchunks + " to file...");
       vb.write_chunk();
       vb.closeDocTable();
-      nchunks += 1;
 
       // MERGE CHUNKS
+      int nchunks = vb.getNChunks();
       ConsoleUX.DebugLog("Merging " + nchunks + " Chunks...");
       boolean remainingChunk = false;
       for (int windowsize = nchunks; windowsize > 0; windowsize = (int) Math.floor(windowsize / 2)) {
