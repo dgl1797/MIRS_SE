@@ -132,12 +132,13 @@ public class IndexManager {
       IntBuffer pl = ByteBuffer.wrap(plBuffer.array()).asIntBuffer();
 
       // EVAL UPPER BOUND
-      double upperbound = 0;
+      double upperbound = -1;
       while (pl.position() < pl.capacity()) {
         long doclen = dTable.doctable.get(pl.get()).doclen;
         int tf = pl.get();
-        upperbound += ((tf) / (Constants.K_ONE * ((1 - Constants.B) + (Constants.B * doclen / dTable.avgDocLen)) + tf)
-            * Math.log10(dTable.ndocs / model.plLength));
+        double score = ((tf) / (Constants.K_ONE * ((1 - Constants.B) + (Constants.B * doclen / dTable.avgDocLen)) + tf)
+            * Math.log10((double) dTable.ndocs / (double) model.plLength));
+        upperbound = score > upperbound ? score : upperbound;
       }
 
       // WRITE POSTING LIST INTO TMP FILE WITH UPPER BOUND AS INITIAL VALUE

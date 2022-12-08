@@ -5,6 +5,7 @@ import java.util.AbstractMap;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.Scanner;
 import java.util.TreeSet;
 import java.util.Map.Entry;
@@ -43,9 +44,9 @@ public class SearchEngine {
     if (command.toLowerCase().equals("exit"))
       return true;
     if (command.toLowerCase().equals("mode")) {
-      isConjunctive = !isConjunctive;
+      isConjunctive = pruneactive ? isConjunctive : !isConjunctive;
     } else if (command.toLowerCase().equals("score")) {
-      isTFIDF = !isTFIDF;
+      isTFIDF = pruneactive ? isTFIDF : !isTFIDF;
     } else if (command.toLowerCase().equals("file")) {
       ConsoleUX.DebugLog("Work in progress");
       ConsoleUX.pause(true, stdin);
@@ -54,6 +55,8 @@ public class SearchEngine {
       loadDataStructures();
     } else if (command.toLowerCase().equals("prune")) {
       pruneactive = !pruneactive;
+      isTFIDF = pruneactive ? false : isTFIDF;
+      isConjunctive = pruneactive ? false : isConjunctive;
     } else if (command.toLowerCase().equals("help")) {
       printHelp();
     } else {
@@ -75,15 +78,11 @@ public class SearchEngine {
     TreeSet<Entry<String, Double>> top20 = new TreeSet<>(new Comparator<Entry<String, Double>>() {
       @Override
       public int compare(Entry<String, Double> e1, Entry<String, Double> e2) {
-        if (e1.getKey().compareTo(e2.getKey()) == 0) {
+        if (e1.getKey().compareTo(e2.getKey()) == 0)
           return 0;
-        } else {
-          if (e2.getValue().compareTo(e1.getValue()) < 0) {
-            return -1;
-          } else {
-            return 1;
-          }
-        }
+        if (e2.getValue().compareTo(e1.getValue()) < 0)
+          return -1;
+        return 1;
       }
     });
 
@@ -196,15 +195,11 @@ public class SearchEngine {
     TreeSet<Entry<String, Double>> top20 = new TreeSet<>(new Comparator<Entry<String, Double>>() {
       @Override
       public int compare(Entry<String, Double> e1, Entry<String, Double> e2) {
-        if (e1.getKey().compareTo(e2.getKey()) == 0) {
+        if (e1.getKey().compareTo(e2.getKey()) == 0)
           return 0;
-        } else {
-          if (e2.getValue().compareTo(e1.getValue()) < 0) {
-            return -1;
-          } else {
-            return 1;
-          }
-        }
+        if (e2.getValue().compareTo(e1.getValue()) < 0)
+          return -1;
+        return 1;
       }
     });
 
@@ -285,6 +280,74 @@ public class SearchEngine {
     return top20;
   }
 
+  /**
+   * performs a disjunctive pruned search on the collection, returning the top 20 documents pruning results
+   * 
+   * @param query the query string
+   * @return the top 20 documents resulting from the query
+   * @throws IOException
+   */
+  private static TreeSet<Entry<String, Double>> prunedSearch(String query) throws IOException {
+    // INITIALIZE TOP20 WITH CORRECT COMPARATOR METHOD
+    TreeSet<Entry<String, Double>> top20 = new TreeSet<>(new Comparator<Entry<String, Double>>() {
+      @Override
+      public int compare(Entry<String, Double> e1, Entry<String, Double> e2) {
+        if (e1.getKey().compareTo(e2.getKey()) == 0)
+          return 0;
+        if (e2.getValue().compareTo(e1.getValue()) < 0)
+          return -1;
+        return 1;
+      }
+    });
+
+    // NORMALIZE QUERY STRING
+    query = TextNormalizationFunctions.cleanText(query);
+    HashMap<String, PostingList> pls = new HashMap<>();
+    LinkedHashMap<String, PostingList> sortedpls = new LinkedHashMap<>();
+
+    // heap with the docids actually targeted by the essential terms' posting lists
+    TreeSet<Integer> docids = new TreeSet<>();
+
+    // OPEN POSTING LISTS
+    for (String w : query.split(" ")) {
+      // filter stopwords
+      if (!stopwords.contains(w)) {
+        // stem when necessary
+        w = stopnostem ? w : TextNormalizationFunctions.ps.stem(w);
+        // filter not present in vocabulary
+        if (!lexicon.vocabulary.containsKey(w))
+          continue;
+
+        // update pls
+        if (pls.containsKey(w)) {
+          pls.get(w).increaseOccurrences();
+        } else {
+          pls.put(w, PostingList.openList(lexicon.vocabulary.get(w).startByte, lexicon.vocabulary.get(w).plLength,
+              stopnostem));
+          docids.add(pls.get(w).getDocID());
+        }
+      }
+    }
+
+    pls.entrySet().stream()
+        .sorted(Comparator.comparingDouble((e) -> (e.getValue().upperBound * e.getValue().occurrences())))
+        .forEach((e) -> sortedpls.put(e.getKey(), e.getValue()));
+    pls.clear();
+    for (String w : sortedpls.keySet()) {
+      ConsoleUX.DebugLog("" + (sortedpls.get(w).upperBound * sortedpls.get(w).occurrences()));
+    }
+
+    if (pls.size() == 0)
+      return top20;
+
+    for (String k : pls.keySet()) {
+      ConsoleUX.DebugLog("" + pls.get(k).upperBound);
+    }
+    ConsoleUX.pause(true, stdin);
+    // PARSE DAAT PRUNING WITH MAXSCORE
+    return top20;
+  }
+
   public static void main(String[] args) {
     try {
       // SETUP STRUCTURES
@@ -321,7 +384,7 @@ public class SearchEngine {
 
         // QUERY START
         long before = System.currentTimeMillis();
-        top20 = isConjunctive ? conjunctiveSearch(query) : disjunctiveSearch(query);
+        top20 = isConjunctive ? conjunctiveSearch(query) : pruneactive ? prunedSearch(query) : disjunctiveSearch(query);
         long delta = System.currentTimeMillis() - before;
         // QUERY END
 

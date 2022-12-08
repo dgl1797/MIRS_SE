@@ -36,6 +36,10 @@ public class PostingList {
     this.occurrences += 1;
   }
 
+  public int occurrences() {
+    return this.occurrences;
+  }
+
   public boolean next() {
     try {
       this.postingList.position(this.postingList.position() + postingSize);
@@ -146,7 +150,7 @@ public class PostingList {
   public double score(int ndocs, int doclen, double avdl) {
     int tf = getFreq();
     return occurrences * ((tf) / (Constants.K_ONE * ((1 - Constants.B) + (Constants.B * doclen / avdl)) + tf)
-        * Math.log10(ndocs / this.totalLength));
+        * Math.log10((double) ndocs / (double) this.totalLength));
   }
 
   public double tfidf(int ndocs) {
