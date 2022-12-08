@@ -117,9 +117,11 @@ public class IndexManager {
             while ((document = inreader.readLine()) != null) {
                 vb.addDocument(document);
             }
+            int nchunks = vb.getNChunks();
+            ConsoleUX.DebugLog("Writing chunk " + nchunks + " to file...");
             vb.write_chunk();
             vb.closeDocTable();
-            int nchunks = vb.getNChunks();
+            nchunks = vb.getNChunks();
             ConsoleUX.DebugLog("Merging " + nchunks + " Chunks...");
             boolean remainingChunk = false;
             //@formatter:off
