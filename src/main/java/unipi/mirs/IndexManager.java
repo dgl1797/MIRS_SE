@@ -208,11 +208,13 @@ public class IndexManager {
       while ((document = inreader.readLine()) != null) {
         vb.addDocument(document);
       }
+      int nchunks = vb.getNChunks();
+      ConsoleUX.DebugLog("Writing chunk " + nchunks + " to file...");
       vb.write_chunk();
       vb.closeDocTable();
+      nchunks += 1;
 
       // MERGE CHUNKS
-      int nchunks = vb.getNChunks();
       ConsoleUX.DebugLog("Merging " + nchunks + " Chunks...");
       boolean remainingChunk = false;
       for (int windowsize = nchunks; windowsize > 0; windowsize = (int) Math.floor(windowsize / 2)) {
@@ -233,9 +235,10 @@ public class IndexManager {
         // calculating if there was a remaining chunk that we need to consider in the next iteration
         remainingChunk = ((windowsize % 2) != 0);
       }
+
+      // RENAME LAST CHUNK TO REMOVE THE _0
       String OUTPUT_LOCATION = stopnostem_mode ? Constants.UNFILTERED_INDEX.toString()
           : Constants.OUTPUT_DIR.toString();
-      // RENAME LAST CHUNK TO REMOVE THE _0
       File lastchunk = Paths.get(OUTPUT_LOCATION, "inverted_index_0.dat").toFile();
       if (!lastchunk.exists()) {
         ConsoleUX
