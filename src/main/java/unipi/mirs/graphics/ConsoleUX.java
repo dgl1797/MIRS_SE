@@ -2,7 +2,7 @@ package unipi.mirs.graphics;
 
 import java.util.Scanner;
 
-public final class ConsoleUX {
+public class ConsoleUX {
   private ConsoleUX() {};
 
   // UTILITY
@@ -39,12 +39,20 @@ public final class ConsoleUX {
     System.out.print(ConsoleUX.RESET + ConsoleUX.FG_BLUE + ConsoleUX.BOLD + log + ConsoleUX.RESET + termination);
   }
 
+  public static final String FormatDebug(String s) {
+    return ConsoleUX.RESET + ConsoleUX.FG_BLUE + ConsoleUX.BOLD + s + ConsoleUX.RESET;
+  }
+
   public static final void SuccessLog(String log) {
     System.out.println(ConsoleUX.RESET + ConsoleUX.FG_GREEN + ConsoleUX.BOLD + log + ConsoleUX.RESET);
   }
 
   public static final void SuccessLog(String log, String termination) {
     System.out.print(ConsoleUX.RESET + ConsoleUX.FG_GREEN + ConsoleUX.BOLD + log + ConsoleUX.RESET + termination);
+  }
+
+  public static final String FormatSuccess(String s) {
+    return ConsoleUX.RESET + ConsoleUX.FG_GREEN + ConsoleUX.BOLD + s + ConsoleUX.RESET;
   }
 
   public static final void ErrorLog(String log) {
@@ -55,6 +63,10 @@ public final class ConsoleUX {
     System.out.print(ConsoleUX.RESET + ConsoleUX.FG_RED + ConsoleUX.BOLD + log + ConsoleUX.RESET + termination);
   }
 
+  public static final String FormatError(String s) {
+    return ConsoleUX.RESET + ConsoleUX.FG_RED + ConsoleUX.BOLD + s + ConsoleUX.RESET;
+  }
+
   /**
    * Pauses the execution of the program until Enter key is pressed.
    * 
@@ -62,7 +74,7 @@ public final class ConsoleUX {
    * @param stdin         to avoid creating multiple instances of a Scanner on the same file
    */
   public static final void pause(boolean clear_console, Scanner stdin) {
-    System.out.println(ConsoleUX.FG_BLUE + "Execution Paused, press Enter to continue..." + ConsoleUX.RESET);
+    System.out.println(FormatDebug("Execution Paused, press Enter to continue..."));
     try {
       stdin.nextLine();
     } catch (Exception e) {

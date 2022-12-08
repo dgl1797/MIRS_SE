@@ -1,3 +1,4 @@
 /target/**
 /src/main/java/unipi/mirs/data/**
+/data/**
 .fake

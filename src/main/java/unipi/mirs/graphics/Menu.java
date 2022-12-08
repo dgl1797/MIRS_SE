@@ -1,36 +1,28 @@
 package unipi.mirs.graphics;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Scanner;
 
 public class Menu {
-  ArrayList<String> options;
-  int numOptions;
-  int exitOption;
-  Scanner stdin;
+  private String[] options;
+  public int numOptions;
+  public int exitOption;
+  private Scanner stdin;
 
   public Menu(Scanner s, String... options) {
-    this.options = new ArrayList<>(Arrays.asList(options));
-    this.numOptions = this.options.size();
-    this.exitOption = this.options.size() - 1;
+    this.options = options;
+    this.numOptions = this.options.length;
+    this.exitOption = this.numOptions - 1;
     this.stdin = s;
   }
 
-  /**
-   * prints the options of the current instance of Menu class
-   * 
-   * @return the selected choice when enter is pressed
-   * @throws IOException if the input stream of stdin is invalid
-   */
   public int printMenu() throws IOException {
     int choice = 0;
     boolean error = false;
     do {
       System.out.print(ConsoleUX.CLS);
       for (int i = 0; i < numOptions; i++) {
-        ConsoleUX.SuccessLog(" " + (i + 1) + " > " + options.get(i));
+        ConsoleUX.SuccessLog(" " + (i + 1) + " > " + options[i]);
       }
       if (error) {
         ConsoleUX.ErrorLog("Invalid Choice");
@@ -57,9 +49,9 @@ public class Menu {
     boolean error = false;
     do {
       System.out.print(ConsoleUX.CLS);
-      System.out.println(ConsoleUX.FG_BLUE + ConsoleUX.BOLD + title);
+      System.out.println(title);
       for (int i = 0; i < numOptions; i++) {
-        ConsoleUX.SuccessLog(" " + (i + 1) + " > " + options.get(i));
+        ConsoleUX.SuccessLog(" " + (i + 1) + " > " + options[i]);
       }
       if (error) {
         ConsoleUX.ErrorLog("Invalid Choice");
@@ -69,16 +61,12 @@ public class Menu {
         choice = Integer.parseInt(tmp);
       } catch (Exception e) {
         for (int i = 0; i < numOptions; i++) {
-          if (tmp.toLowerCase().equals(options.get(i).toLowerCase()))
+          if (tmp.toLowerCase().equals(options[i].toLowerCase()))
             choice = i + 1;
         }
       }
       error = true;
     } while (!(choice >= 1 && choice <= numOptions));
     return choice - 1;
-  }
-
-  public int exitMenuOption() {
-    return this.exitOption;
   }
 }
