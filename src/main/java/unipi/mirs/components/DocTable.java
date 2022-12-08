@@ -8,11 +8,12 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.HashMap;
 
+import unipi.mirs.models.DocTableModel;
 import unipi.mirs.utilities.Constants;
 
 public class DocTable {
   //[0] is the docno , [1] the doclen
-  public HashMap<Integer, Object[]> doctable = new HashMap<>();
+  public HashMap<Integer, DocTableModel> doctable = new HashMap<>();
   public int ndocs = 0;
   public double avgDocLen = 0;
   public boolean stopnostem;
@@ -43,36 +44,22 @@ public class DocTable {
       // count the number of documents in this doctable
       dTable.ndocs += 1;
 
-      // split the components
-      String[] parts = line.split("\t");
-      int docid = Integer.parseInt(parts[0]);
+      // parse line
+      DocTableModel model = new DocTableModel(line);
 
       // update the average summation
-      dTable.avgDocLen += Integer.parseInt(parts[1].split("-")[1]);
-      if (dTable.doctable.containsKey(docid)) {
+      dTable.avgDocLen += model.doclen();
+      if (dTable.doctable.containsKey(model.docid())) {
         throw new IOException("Malformed Document table");
       }
 
       // update the hashmap between docid and [docno, doclen]
-      dTable.doctable.put(docid, getComponents(parts[1]));
+      dTable.doctable.put(model.docid(), model);
     }
     // divide to get the avg_doc_len
     dTable.avgDocLen /= dTable.ndocs;
 
     // RETURN THE INSTANCE OF DOCTABLE
     return dTable;
-  }
-
-  // HELPER FUNCTIONS
-
-  /**
-   * Helper Function to get the components of the document as docno in [0] and doclen in [1]
-   * 
-   * @param line
-   * @return
-   */
-  private static Object[] getComponents(String line) {
-    String[] parts = line.split("-");
-    return new Object[] { parts[0], Integer.parseInt(parts[1]) };
   }
 }

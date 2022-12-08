@@ -135,7 +135,7 @@ public class IndexManager {
       // EVAL UPPER BOUND
       double upperbound = 0;
       while (pl.position() < pl.capacity()) {
-        int doclen = ((int) dTable.doctable.get(pl.get())[1]);
+        long doclen = dTable.doctable.get(pl.get()).doclen();
         int tf = pl.get();
         upperbound += ((tf) / (Constants.K_ONE * ((1 - Constants.B) + (Constants.B * doclen / dTable.avgDocLen)) + tf)
             * Math.log10(dTable.ndocs / pllength));
