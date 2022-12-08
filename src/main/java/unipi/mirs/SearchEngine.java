@@ -10,9 +10,9 @@ import java.util.TreeSet;
 import java.util.Map.Entry;
 
 import unipi.mirs.components.DocTable;
+import unipi.mirs.components.PostingList;
 import unipi.mirs.components.Vocabulary;
 import unipi.mirs.graphics.ConsoleUX;
-import unipi.mirs.models.QueryTermModel;
 import unipi.mirs.utilities.TextNormalizationFunctions;
 
 public class SearchEngine {
@@ -88,7 +88,7 @@ public class SearchEngine {
     query = TextNormalizationFunctions.cleanText(query);
 
     // OPEN THE POSTING LISTS AND GET THE MAX DOCID
-    HashMap<String, QueryTermModel> pls = new HashMap<>();
+    HashMap<String, PostingList> pls = new HashMap<>();
     int maxdocid = -1;
     int oldMax = -1;
     for (String w : query.split(" ")) {
@@ -104,13 +104,13 @@ public class SearchEngine {
 
         // update the posting lists data structure
         if (pls.containsKey(w)) {
-          pls.get(w).increase();
+          pls.get(w).increaseOccurrences();
         } else {
-          pls.put(w, new QueryTermModel(w, lexicon.vocabulary.get(w).startByte(), lexicon.vocabulary.get(w).plLength(),
+          pls.put(w, PostingList.openList(lexicon.vocabulary.get(w).startByte(), lexicon.vocabulary.get(w).plLength(),
               stopnostem));
 
           // check if the opened docid is greater than maxdocid
-          int currentdocid = pls.get(w).pl().getDocID();
+          int currentdocid = pls.get(w).getDocID();
           maxdocid = (currentdocid > maxdocid) ? currentdocid : maxdocid;
         }
       }
@@ -129,12 +129,12 @@ public class SearchEngine {
         oldMax = maxdocid;
         // looping over all the postings untill we reach a common maxdocid (oldmax will not change)
         for (String w : pls.keySet()) {
-          if (!pls.get(w).pl().nextGEQ(maxdocid)) {
+          if (!pls.get(w).nextGEQ(maxdocid)) {
             isover = true;
             break;
           }
           // update the maxdocid
-          int currentdocid = pls.get(w).pl().getDocID();
+          int currentdocid = pls.get(w).getDocID();
           maxdocid = (currentdocid > maxdocid) ? currentdocid : maxdocid;
         }
         if (isover)
@@ -146,9 +146,8 @@ public class SearchEngine {
       // compute the score for the max common docid
       double total = 0;
       for (String w : pls.keySet()) {
-        double currentscore = isTFIDF ? pls.get(w).pl().tfidf(doctable.ndocs, pls.get(w).occurrences())
-            : pls.get(w).pl().score(doctable.ndocs, pls.get(w).occurrences(), doctable.doctable.get(maxdocid).doclen(),
-                doctable.avgDocLen);
+        double currentscore = isTFIDF ? pls.get(w).tfidf(doctable.ndocs)
+            : pls.get(w).score(doctable.ndocs, doctable.doctable.get(maxdocid).doclen(), doctable.avgDocLen);
         total += currentscore;
       }
       // we have the score of the document maxdocid, now we insert it into the top20
@@ -166,13 +165,13 @@ public class SearchEngine {
 
       // advance the positions of each postinglist
       for (String w : pls.keySet()) {
-        if (!pls.get(w).pl().next()) {
+        if (!pls.get(w).next()) {
           // returned false hence posting list is over so we need to break
           isover = true;
           break;
         }
         // update maxdocid
-        int currentdocid = pls.get(w).pl().getDocID();
+        int currentdocid = pls.get(w).getDocID();
         maxdocid = (currentdocid > maxdocid) ? currentdocid : maxdocid;
       }
       if (isover)
@@ -201,7 +200,7 @@ public class SearchEngine {
 
     // NORMALIZE QUERY STRING
     query = TextNormalizationFunctions.cleanText(query);
-    HashMap<String, QueryTermModel> pls = new HashMap<>();
+    HashMap<String, PostingList> pls = new HashMap<>();
 
     // heap with the docids actually targeted by the terms' posting lists
     TreeSet<Integer> docids = new TreeSet<>();
@@ -220,11 +219,11 @@ public class SearchEngine {
 
         // update posting lists structure
         if (pls.containsKey(w)) {
-          pls.get(w).increase();
+          pls.get(w).increaseOccurrences();
         } else {
-          pls.put(w, new QueryTermModel(w, lexicon.vocabulary.get(w).startByte(), lexicon.vocabulary.get(w).plLength(),
+          pls.put(w, PostingList.openList(lexicon.vocabulary.get(w).startByte(), lexicon.vocabulary.get(w).plLength(),
               stopnostem));
-          docids.add(pls.get(w).pl().getDocID());
+          docids.add(pls.get(w).getDocID());
         }
       }
     }
@@ -242,20 +241,19 @@ public class SearchEngine {
       int currentdocid = docids.first();
       for (String w : pls.keySet()) {
         // skip ended posting lists
-        if (pls.get(w).pl().isover())
+        if (pls.get(w).isover())
           continue;
 
         // check if this posting list is in correct position
-        int listdocid = pls.get(w).pl().getDocID();
+        int listdocid = pls.get(w).getDocID();
         if (currentdocid == listdocid) {
-          docscore += isTFIDF ? pls.get(w).pl().tfidf(doctable.ndocs, pls.get(w).occurrences())
-              : pls.get(w).pl().score(doctable.ndocs, pls.get(w).occurrences(),
-                  ((int) doctable.doctable.get(listdocid).doclen()), doctable.avgDocLen);
+          docscore += isTFIDF ? pls.get(w).tfidf(doctable.ndocs)
+              : pls.get(w).score(doctable.ndocs, doctable.doctable.get(listdocid).doclen(), doctable.avgDocLen);
 
-          if (!pls.get(w).pl().next()) {
+          if (!pls.get(w).next()) {
             completedPostingLists += 1;
           } else {
-            docids.add(pls.get(w).pl().getDocID());
+            docids.add(pls.get(w).getDocID());
           }
         }
       }

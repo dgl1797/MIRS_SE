@@ -13,6 +13,7 @@ import unipi.mirs.utilities.Constants;
 public class PostingList {
   private final int postingSize = 2;
   private IntBuffer postingList = null;
+  private int occurrences = 0;
   public int totalLength = 0;
   public double upperBound = 0;
 
@@ -28,6 +29,10 @@ public class PostingList {
 
   public int getFreq() {
     return this.postingList.get(this.postingList.position() + 1);
+  }
+
+  public void increaseOccurrences() {
+    this.occurrences += 1;
   }
 
   public boolean next() {
@@ -48,6 +53,7 @@ public class PostingList {
 
   public static PostingList openList(long startPosition, int plLength, boolean stopnostem) throws IOException {
     PostingList postinglist = new PostingList();
+    postinglist.occurrences = 1;
 
     // TAKE THE POSTING LIST FROM THE CORRECT FILE
     int bytelength = plLength * 2 * Integer.BYTES;
@@ -136,14 +142,14 @@ public class PostingList {
     return this.postingList.position() >= this.postingList.capacity();
   }
 
-  public double score(int ndocs, int noccurrences, int doclen, double avdl) {
+  public double score(int ndocs, int doclen, double avdl) {
     int tf = getFreq();
-    return noccurrences * ((tf) / (Constants.K_ONE * ((1 - Constants.B) + (Constants.B * doclen / avdl)) + tf)
+    return occurrences * ((tf) / (Constants.K_ONE * ((1 - Constants.B) + (Constants.B * doclen / avdl)) + tf)
         * Math.log10(ndocs / this.totalLength));
   }
 
-  public double tfidf(int ndocs, int noccurences) {
+  public double tfidf(int ndocs) {
     int tf = getFreq();
-    return noccurences * (1 + (Math.log10(tf))) * (Math.log10((double) ndocs / (double) this.totalLength));
+    return occurrences * (1 + (Math.log10(tf))) * (Math.log10((double) ndocs / (double) this.totalLength));
   }
 }
