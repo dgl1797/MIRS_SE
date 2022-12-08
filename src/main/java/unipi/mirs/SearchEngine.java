@@ -22,6 +22,7 @@ public class SearchEngine {
   private static boolean isConjunctive = false;
   private static boolean isTFIDF = true;
   private static boolean stopnostem = false;
+  private static boolean pruneactive = false;
   private static int parsedDocs = 0;
 
   // DATA STRUCTURES
@@ -51,6 +52,8 @@ public class SearchEngine {
     } else if (command.toLowerCase().equals("filter")) {
       stopnostem = !stopnostem;
       loadDataStructures();
+    } else if (command.toLowerCase().equals("prune")) {
+      pruneactive = !pruneactive;
     } else if (command.toLowerCase().equals("help")) {
       printHelp();
     } else {
@@ -289,6 +292,8 @@ public class SearchEngine {
         // SHOW THE QUERY SETTINGS
         ConsoleUX.DebugLog("Stopwords and Stemming filtering: ", "");
         ConsoleUX.SuccessLog(stopnostem ? "disabled" : "enabled");
+        ConsoleUX.DebugLog("Dynamic Pruning: ", "");
+        ConsoleUX.SuccessLog(pruneactive ? "enabled" : "disabled");
         ConsoleUX.SuccessLog("Search", "");
         ConsoleUX.DebugLog("[" + (isConjunctive ? "c" : "d") + "]", "");
         ConsoleUX.DebugLog("[" + (isTFIDF ? "tfidf" : "bm25") + "]", "");
@@ -298,7 +303,7 @@ public class SearchEngine {
         String query = stdin.nextLine();
 
         // CHECK QUERY MATCHES A COMMAND FORMAT
-        if (query.matches("^\\/(help|mode|filter|score|file|exit)\\/$")) {
+        if (query.matches("^\\/(help|mode|filter|prune|score|file|exit)\\/$")) {
           if (handleCommand(query.replaceAll("\\/", ""))) {
             // termination if user enters /exit/ in the search field
             break;
@@ -331,7 +336,8 @@ public class SearchEngine {
   private static final void printHelp() {
     ConsoleUX.SuccessLog(ConsoleUX.CLS + "/help/ - prints the guide for all possible commands");
     ConsoleUX.SuccessLog("/mode/ - changes query mode(conjunctive - disjunctive)");
-    ConsoleUX.SuccessLog("/filter/ - performs queries including stopwords and without the stemming process");
+    ConsoleUX.SuccessLog("/filter/ - performs queries including stopwords and without stemming");
+    ConsoleUX.SuccessLog("/prune/ - enables/disables dynamic pruning to speed up the search process");
     ConsoleUX.SuccessLog("/score/ - changes scoring function to be used for ranked retrieval(TFIDF - BM25)");
     ConsoleUX.SuccessLog("/file/ - performs queries taking them from a selected file");
     ConsoleUX.SuccessLog("/exit/ - stops the interactive search");
