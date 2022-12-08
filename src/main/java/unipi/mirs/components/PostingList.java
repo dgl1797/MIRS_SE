@@ -14,6 +14,7 @@ public class PostingList {
   private final int postingSize = 2;
   private IntBuffer postingList = null;
   private int occurrences = 0;
+
   public int totalLength = 0;
   public double upperBound = 0;
 

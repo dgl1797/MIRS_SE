@@ -48,13 +48,13 @@ public class DocTable {
       DocTableModel model = new DocTableModel(line);
 
       // update the average summation
-      dTable.avgDocLen += model.doclen();
-      if (dTable.doctable.containsKey(model.docid())) {
+      dTable.avgDocLen += model.doclen;
+      if (dTable.doctable.containsKey(model.docid)) {
         throw new IOException("Malformed Document table");
       }
 
       // update the hashmap between docid and [docno, doclen]
-      dTable.doctable.put(model.docid(), model);
+      dTable.doctable.put(model.docid, model);
     }
     // divide to get the avg_doc_len
     dTable.avgDocLen /= dTable.ndocs;

@@ -291,19 +291,19 @@ public class IndexBuilder {
         VocabularyModel leftmodel = new VocabularyModel(leftTerm);
         VocabularyModel rightmodel = new VocabularyModel(rightTerm);
 
-        if (leftmodel.term().equals(rightmodel.term())) {
+        if (leftmodel.term.equals(rightmodel.term)) {
           // concatenate right's posting to left's posting
-          byte[] bl = invindexes[0].readNBytes((leftmodel.plLength()) * 2 * Integer.BYTES);
-          byte[] br = invindexes[1].readNBytes((rightmodel.plLength()) * 2 * Integer.BYTES);
+          byte[] bl = invindexes[0].readNBytes((leftmodel.plLength) * 2 * Integer.BYTES);
+          byte[] br = invindexes[1].readNBytes((rightmodel.plLength) * 2 * Integer.BYTES);
           byte[] result = ByteBuffer.allocate(bl.length + br.length).put(bl).put(br).array();
 
           // write to tmp files
-          newLexicon.write(String.format("%s\t%d-%d\n", leftmodel.term(), currentByte,
-              (leftmodel.plLength()) + (rightmodel.plLength())));
+          newLexicon.write(
+              String.format("%s\t%d-%d\n", leftmodel.term, currentByte, (leftmodel.plLength) + (rightmodel.plLength)));
           newInvindex.write(result);
           if (debugmode) {
-            debugWriter.write(String.format("%s\t%d -> %s\n", leftmodel.term(),
-                (leftmodel.plLength()) + (rightmodel.plLength()), byteBufferToString(ByteBuffer.wrap(result))));
+            debugWriter.write(String.format("%s\t%d -> %s\n", leftmodel.term,
+                (leftmodel.plLength) + (rightmodel.plLength), byteBufferToString(ByteBuffer.wrap(result))));
           }
 
           // advance both the files
@@ -311,24 +311,24 @@ public class IndexBuilder {
           rightTerm = lexicons[1].readLine();
           currentByte += result.length;
 
-        } else if (leftmodel.term().compareTo(rightmodel.term()) < 0) {
+        } else if (leftmodel.term.compareTo(rightmodel.term) < 0) {
           // lterm comes before rterm
-          byte[] bl = invindexes[0].readNBytes((leftmodel.plLength()) * 2 * Integer.BYTES);
-          newLexicon.write(String.format("%s\t%d-%d\n", leftmodel.term(), currentByte, (leftmodel.plLength())));
+          byte[] bl = invindexes[0].readNBytes((leftmodel.plLength) * 2 * Integer.BYTES);
+          newLexicon.write(String.format("%s\t%d-%d\n", leftmodel.term, currentByte, (leftmodel.plLength)));
           newInvindex.write(bl);
           if (debugmode) {
-            debugWriter.write(String.format("%s\t%d -> %s\n", leftmodel.term(), (leftmodel.plLength()),
+            debugWriter.write(String.format("%s\t%d -> %s\n", leftmodel.term, (leftmodel.plLength),
                 byteBufferToString(ByteBuffer.wrap(bl))));
           }
           leftTerm = lexicons[0].readLine();
           currentByte += bl.length;
         } else {
           // rterm comes before rterm
-          byte[] br = invindexes[1].readNBytes((rightmodel.plLength()) * 2 * Integer.BYTES);
-          newLexicon.write(String.format("%s\t%d-%d\n", rightmodel.term(), currentByte, (rightmodel.plLength())));
+          byte[] br = invindexes[1].readNBytes((rightmodel.plLength) * 2 * Integer.BYTES);
+          newLexicon.write(String.format("%s\t%d-%d\n", rightmodel.term, currentByte, (rightmodel.plLength)));
           newInvindex.write(br);
           if (debugmode) {
-            debugWriter.write(String.format("%s\t%d -> %s\n", rightmodel.term(), (rightmodel.plLength()),
+            debugWriter.write(String.format("%s\t%d -> %s\n", rightmodel.term, (rightmodel.plLength),
                 byteBufferToString(ByteBuffer.wrap(br))));
           }
           rightTerm = lexicons[1].readLine();
@@ -504,13 +504,13 @@ public class IndexBuilder {
       VocabularyModel model = new VocabularyModel(currentTerm);
 
       // save posting list into byte[]
-      byte[] pl = invindex.readNBytes(2 * Integer.BYTES * (model.plLength()));
+      byte[] pl = invindex.readNBytes(2 * Integer.BYTES * (model.plLength));
 
       // update tmp files
-      newLexicon.write(String.format("%s\t%d-%d\n", model.term(), currentByte, (model.plLength())));
+      newLexicon.write(String.format("%s\t%d-%d\n", model.term, currentByte, (model.plLength)));
       if (debugmode) {
         newDebug.write(
-            String.format("%s\t%d -> %s\n", model.term(), (model.plLength()), byteBufferToString(ByteBuffer.wrap(pl))));
+            String.format("%s\t%d -> %s\n", model.term, (model.plLength), byteBufferToString(ByteBuffer.wrap(pl))));
       }
       newInvindex.write(pl);
 

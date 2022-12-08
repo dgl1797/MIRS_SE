@@ -128,16 +128,16 @@ public class IndexManager {
     while ((terminfos = lr.readLine()) != null) {
       // READ POSTING LIST INTO INT_BUFFER
       VocabularyModel model = new VocabularyModel(terminfos);
-      ByteBuffer plBuffer = ByteBuffer.wrap(iir.readNBytes(model.plLength() * 2 * Integer.BYTES));
+      ByteBuffer plBuffer = ByteBuffer.wrap(iir.readNBytes(model.plLength * 2 * Integer.BYTES));
       IntBuffer pl = ByteBuffer.wrap(plBuffer.array()).asIntBuffer();
 
       // EVAL UPPER BOUND
       double upperbound = 0;
       while (pl.position() < pl.capacity()) {
-        long doclen = dTable.doctable.get(pl.get()).doclen();
+        long doclen = dTable.doctable.get(pl.get()).doclen;
         int tf = pl.get();
         upperbound += ((tf) / (Constants.K_ONE * ((1 - Constants.B) + (Constants.B * doclen / dTable.avgDocLen)) + tf)
-            * Math.log10(dTable.ndocs / model.plLength()));
+            * Math.log10(dTable.ndocs / model.plLength));
       }
 
       // WRITE POSTING LIST INTO TMP FILE WITH UPPER BOUND AS INITIAL VALUE
@@ -146,8 +146,8 @@ public class IndexManager {
       iiw.write(plBuffer.array());
 
       // UPDATE TMP LEXICON
-      lw.write(String.format("%s\t%d-%d\n", model.term(), currentByte, model.plLength()));
-      currentByte += (Double.BYTES + (2 * Integer.BYTES * model.plLength()));
+      lw.write(String.format("%s\t%d-%d\n", model.term, currentByte, model.plLength));
+      currentByte += (Double.BYTES + (2 * Integer.BYTES * model.plLength));
     }
 
     // CLOSE STREAMS

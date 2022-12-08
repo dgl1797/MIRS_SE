@@ -106,7 +106,7 @@ public class SearchEngine {
         if (pls.containsKey(w)) {
           pls.get(w).increaseOccurrences();
         } else {
-          pls.put(w, PostingList.openList(lexicon.vocabulary.get(w).startByte(), lexicon.vocabulary.get(w).plLength(),
+          pls.put(w, PostingList.openList(lexicon.vocabulary.get(w).startByte, lexicon.vocabulary.get(w).plLength,
               stopnostem));
 
           // check if the opened docid is greater than maxdocid
@@ -147,7 +147,7 @@ public class SearchEngine {
       double total = 0;
       for (String w : pls.keySet()) {
         double currentscore = isTFIDF ? pls.get(w).tfidf(doctable.ndocs)
-            : pls.get(w).score(doctable.ndocs, doctable.doctable.get(maxdocid).doclen(), doctable.avgDocLen);
+            : pls.get(w).score(doctable.ndocs, doctable.doctable.get(maxdocid).doclen, doctable.avgDocLen);
         total += currentscore;
       }
       // we have the score of the document maxdocid, now we insert it into the top20
@@ -156,11 +156,11 @@ public class SearchEngine {
         if (top20.last().getValue() < total) {
           // we need to replace last item:
           top20.pollLast();
-          top20.add(new AbstractMap.SimpleEntry<String, Double>(doctable.doctable.get(maxdocid).docno(), total));
+          top20.add(new AbstractMap.SimpleEntry<String, Double>(doctable.doctable.get(maxdocid).docno, total));
         }
       } else {
         // still not reached the limit so we simply add
-        top20.add(new AbstractMap.SimpleEntry<String, Double>(doctable.doctable.get(maxdocid).docno(), total));
+        top20.add(new AbstractMap.SimpleEntry<String, Double>(doctable.doctable.get(maxdocid).docno, total));
       }
 
       // advance the positions of each postinglist
@@ -221,7 +221,7 @@ public class SearchEngine {
         if (pls.containsKey(w)) {
           pls.get(w).increaseOccurrences();
         } else {
-          pls.put(w, PostingList.openList(lexicon.vocabulary.get(w).startByte(), lexicon.vocabulary.get(w).plLength(),
+          pls.put(w, PostingList.openList(lexicon.vocabulary.get(w).startByte, lexicon.vocabulary.get(w).plLength,
               stopnostem));
           docids.add(pls.get(w).getDocID());
         }
@@ -248,7 +248,7 @@ public class SearchEngine {
         int listdocid = pls.get(w).getDocID();
         if (currentdocid == listdocid) {
           docscore += isTFIDF ? pls.get(w).tfidf(doctable.ndocs)
-              : pls.get(w).score(doctable.ndocs, doctable.doctable.get(listdocid).doclen(), doctable.avgDocLen);
+              : pls.get(w).score(doctable.ndocs, doctable.doctable.get(listdocid).doclen, doctable.avgDocLen);
 
           if (!pls.get(w).next()) {
             completedPostingLists += 1;
@@ -263,11 +263,11 @@ public class SearchEngine {
         if (top20.last().getValue() < docscore) {
           // substitute
           top20.pollLast();
-          top20.add(new AbstractMap.SimpleEntry<String, Double>(doctable.doctable.get(currentdocid).docno(), docscore));
+          top20.add(new AbstractMap.SimpleEntry<String, Double>(doctable.doctable.get(currentdocid).docno, docscore));
         }
       } else {
         // simple add
-        top20.add(new AbstractMap.SimpleEntry<String, Double>(doctable.doctable.get(currentdocid).docno(), docscore));
+        top20.add(new AbstractMap.SimpleEntry<String, Double>(doctable.doctable.get(currentdocid).docno, docscore));
       }
       lastdocid = docids.pollFirst();
     }

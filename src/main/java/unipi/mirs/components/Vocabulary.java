@@ -43,10 +43,10 @@ public class Vocabulary {
       // parse line
       VocabularyModel model = new VocabularyModel(line);
 
-      if (lexicon.vocabulary.containsKey(model.term())) {
+      if (lexicon.vocabulary.containsKey(model.term)) {
         throw new IOException("Malformed Vocabulary");
       }
-      lexicon.vocabulary.put(model.term(), model);
+      lexicon.vocabulary.put(model.term, model);
     }
 
     // RETURN THE FILLED INSTANCE OF VOCABULARY
