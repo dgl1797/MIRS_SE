@@ -24,6 +24,7 @@ import unipi.mirs.components.DocTable;
 import unipi.mirs.components.IndexBuilder;
 import unipi.mirs.graphics.ConsoleUX;
 import unipi.mirs.graphics.Menu;
+import unipi.mirs.models.VocabularyModel;
 import unipi.mirs.utilities.Constants;
 
 public class IndexManager {
@@ -126,10 +127,8 @@ public class IndexManager {
     long currentByte = 0;
     while ((terminfos = lr.readLine()) != null) {
       // READ POSTING LIST INTO INT_BUFFER
-      String[] parts = terminfos.split("\t");
-      String term = parts[0];
-      int pllength = Integer.parseInt(parts[1].split("-")[1]);
-      ByteBuffer plBuffer = ByteBuffer.wrap(iir.readNBytes(pllength * 2 * Integer.BYTES));
+      VocabularyModel model = new VocabularyModel(terminfos);
+      ByteBuffer plBuffer = ByteBuffer.wrap(iir.readNBytes(model.plLength() * 2 * Integer.BYTES));
       IntBuffer pl = ByteBuffer.wrap(plBuffer.array()).asIntBuffer();
 
       // EVAL UPPER BOUND
@@ -138,7 +137,7 @@ public class IndexManager {
         long doclen = dTable.doctable.get(pl.get()).doclen();
         int tf = pl.get();
         upperbound += ((tf) / (Constants.K_ONE * ((1 - Constants.B) + (Constants.B * doclen / dTable.avgDocLen)) + tf)
-            * Math.log10(dTable.ndocs / pllength));
+            * Math.log10(dTable.ndocs / model.plLength()));
       }
 
       // WRITE POSTING LIST INTO TMP FILE WITH UPPER BOUND AS INITIAL VALUE
@@ -147,8 +146,8 @@ public class IndexManager {
       iiw.write(plBuffer.array());
 
       // UPDATE TMP LEXICON
-      lw.write(String.format("%s\t%d-%d\n", term, currentByte, pllength));
-      currentByte += (Double.BYTES + (2 * Integer.BYTES * pllength));
+      lw.write(String.format("%s\t%d-%d\n", model.term(), currentByte, model.plLength()));
+      currentByte += (Double.BYTES + (2 * Integer.BYTES * model.plLength()));
     }
 
     // CLOSE STREAMS
