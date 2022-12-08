@@ -184,6 +184,13 @@ public class SearchEngine {
     return top20;
   }
 
+  /**
+   * performs a disjunvtive query on the collection, returning the top 20 documents where at least one term occurs
+   * 
+   * @param query the query string
+   * @return the top 20 documents resulting from the query
+   * @throws IOException
+   */
   private static TreeSet<Entry<String, Double>> disjunctiveSearch(String query) throws IOException {
     // INITIALIZE TOP20 WITH CORRECT COMPARATOR METHOD
     TreeSet<Entry<String, Double>> top20 = new TreeSet<>(new Comparator<Entry<String, Double>>() {
