@@ -10,13 +10,14 @@ import java.nio.file.Paths;
 import unipi.mirs.graphics.ConsoleUX;
 import unipi.mirs.utilities.Constants;
 
-public class PostingList {
+public class PostingList implements Comparable<PostingList> {
   private final int postingSize = 2;
   private IntBuffer postingList = null;
   private int occurrences = 0;
 
   public int totalLength = 0;
   public double upperBound = 0;
+  public String term = "";
 
   private PostingList() {}
 
@@ -56,9 +57,11 @@ public class PostingList {
     this.postingList = null;
   }
 
-  public static PostingList openList(long startPosition, int plLength, boolean stopnostem) throws IOException {
+  public static PostingList openList(String term, long startPosition, int plLength, boolean stopnostem)
+      throws IOException {
     PostingList postinglist = new PostingList();
     postinglist.occurrences = 1;
+    postinglist.term = term;
 
     // TAKE THE POSTING LIST FROM THE CORRECT FILE
     int bytelength = plLength * 2 * Integer.BYTES;
@@ -156,5 +159,10 @@ public class PostingList {
   public double tfidf(int ndocs) {
     int tf = getFreq();
     return occurrences * (1 + (Math.log10(tf))) * (Math.log10((double) ndocs / (double) this.totalLength));
+  }
+
+  @Override
+  public int compareTo(PostingList p2) {
+    return Double.compare(this.upperBound, p2.upperBound);
   }
 }

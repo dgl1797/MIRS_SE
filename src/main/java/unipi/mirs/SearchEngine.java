@@ -2,10 +2,11 @@ package unipi.mirs;
 
 import java.io.IOException;
 import java.util.AbstractMap;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.Scanner;
 import java.util.TreeSet;
 import java.util.Map.Entry;
@@ -108,7 +109,7 @@ public class SearchEngine {
         if (pls.containsKey(w)) {
           pls.get(w).increaseOccurrences();
         } else {
-          pls.put(w, PostingList.openList(lexicon.vocabulary.get(w).startByte, lexicon.vocabulary.get(w).plLength,
+          pls.put(w, PostingList.openList(w, lexicon.vocabulary.get(w).startByte, lexicon.vocabulary.get(w).plLength,
               stopnostem));
 
           // check if the opened docid is greater than maxdocid
@@ -226,7 +227,7 @@ public class SearchEngine {
         if (pls.containsKey(w)) {
           pls.get(w).increaseOccurrences();
         } else {
-          pls.put(w, PostingList.openList(lexicon.vocabulary.get(w).startByte, lexicon.vocabulary.get(w).plLength,
+          pls.put(w, PostingList.openList(w, lexicon.vocabulary.get(w).startByte, lexicon.vocabulary.get(w).plLength,
               stopnostem));
           docids.add(pls.get(w).getDocID());
         }
@@ -302,8 +303,8 @@ public class SearchEngine {
 
     // NORMALIZE QUERY STRING
     query = TextNormalizationFunctions.cleanText(query);
-    HashMap<String, PostingList> pls = new HashMap<>();
-    LinkedHashMap<String, PostingList> sortedpls = new LinkedHashMap<>();
+    HashMap<String, Integer> alreadyAppeared = new HashMap<>();
+    ArrayList<PostingList> postinglists = new ArrayList<>();
 
     // heap with the docids actually targeted by the essential terms' posting lists
     TreeSet<Integer> docids = new TreeSet<>();
@@ -318,33 +319,71 @@ public class SearchEngine {
         if (!lexicon.vocabulary.containsKey(w))
           continue;
 
-        // update pls
-        if (pls.containsKey(w)) {
-          pls.get(w).increaseOccurrences();
+        // update postinglists
+        if (alreadyAppeared.containsKey(w)) {
+          postinglists.get(alreadyAppeared.get(w)).increaseOccurrences();
         } else {
-          pls.put(w, PostingList.openList(lexicon.vocabulary.get(w).startByte, lexicon.vocabulary.get(w).plLength,
-              stopnostem));
-          docids.add(pls.get(w).getDocID());
+          alreadyAppeared.put(w, postinglists.size());
+          postinglists.add(PostingList.openList(w, lexicon.vocabulary.get(w).startByte,
+              lexicon.vocabulary.get(w).plLength, stopnostem));
+          docids.add(postinglists.get(postinglists.size() - 1).getDocID());
         }
       }
     }
 
-    pls.entrySet().stream()
-        .sorted(Comparator.comparingDouble((e) -> (e.getValue().upperBound * e.getValue().occurrences())))
-        .forEach((e) -> sortedpls.put(e.getKey(), e.getValue()));
-    pls.clear();
-    for (String w : sortedpls.keySet()) {
-      ConsoleUX.DebugLog("" + (sortedpls.get(w).upperBound * sortedpls.get(w).occurrences()));
-    }
-
-    if (pls.size() == 0)
+    if (postinglists.size() == 0)
       return top20;
 
-    for (String k : pls.keySet()) {
-      ConsoleUX.DebugLog("" + pls.get(k).upperBound);
+    Collections.sort(postinglists);
+    Double currentThreshold = 0d;
+
+    // LOOP OVER THE ORDERED POSTING LISTS
+    while (!docids.isEmpty()) {
+      // initialize document-relative parameters
+      int currentdocid = docids.first();
+      double cumulative = 0;
+      double docscore = 0;
+
+      // check every posting list state
+      for (PostingList pl : postinglists) {
+        // consider as term's upperbound the sum of all the previous
+        cumulative += (pl.upperBound * pl.occurrences());
+
+        // if it is lower than the currentThreshold just nextgeq to the current docid
+        if (cumulative <= currentThreshold) {
+          pl.nextGEQ(currentdocid);
+        }
+
+        if (pl.isover())
+          continue;
+
+        // compute the score when necessary
+        if (pl.getDocID() == currentdocid) {
+          docscore += pl.score(doctable.ndocs, doctable.doctable.get(currentdocid).doclen, doctable.avgDocLen);
+          if (cumulative > currentThreshold && pl.next()) {
+            docids.add(pl.getDocID());
+          }
+        }
+      }
+
+      // check if top 20 has to be updated 
+      if (top20.size() == 20) {
+        if (docscore > top20.last().getValue()) {
+          // case top 20 is full, replace and update threshold
+          top20.pollLast();
+          top20.add(new AbstractMap.SimpleEntry<String, Double>(doctable.doctable.get(currentdocid).docno, docscore));
+          currentThreshold = top20.last().getValue();
+        }
+      } else {
+        // case it is not full yet, just push and update threshold when necessary
+        top20.add(new AbstractMap.SimpleEntry<String, Double>(doctable.doctable.get(currentdocid).docno, docscore));
+        currentThreshold = top20.size() == 20 ? top20.last().getValue() : 0d;
+      }
+
+      // remove the parsed docid
+      docids.pollFirst();
     }
-    ConsoleUX.pause(true, stdin);
-    // PARSE DAAT PRUNING WITH MAXSCORE
+
     return top20;
   }
 
