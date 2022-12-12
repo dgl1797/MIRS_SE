@@ -5,46 +5,51 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.HashMap;
 
+import unipi.mirs.models.VocabularyModel;
 import unipi.mirs.utilities.Constants;
 
 public class Vocabulary {
-  public HashMap<String, Long[]> vocabulary = new HashMap<String, Long[]>();
+
+  //the cell [0] is the docid , into the cell [1] there is the posting list length
+  public HashMap<String, VocabularyModel> vocabulary = new HashMap<>();
   public boolean stopnostem;
-  //the cell [0] is the docid , into the cell [1] there is the length
-  public Vocabulary(boolean stopnostem_mode) {
-     this.stopnostem = stopnostem_mode;
-    }
 
-  private Long[] getComponents(String line) {
-    String[] parts = line.split("-");
-    return new Long[] { Long.parseLong(parts[0]), Long.parseLong(parts[1]) };
-  }
+  private Vocabulary() {}
 
-  public void loadVocabulary() throws IOException {
-    String OUTPUT_LOCATION = stopnostem ? Constants.STOPNOSTEM_OUTPUT_DIR.toString() : Constants.OUTPUT_DIR.toString();
-    Path vocabularyPath = Paths.get(OUTPUT_LOCATION, "lexicon.dat");
-    File vocabularyFile = new File(vocabularyPath.toString());
+  /**
+   * Initializes a Vocabulary instance from the filtered/unfiltered index basing on the selected mode
+   * 
+   * @param stopnostem boolean stating wheather or not the filtering is enabled or not
+   * @return the instance of the vocabulary
+   * @throws IOException
+   */
+  public static Vocabulary loadVocabulary(boolean stopnostem) throws IOException {
+    Vocabulary lexicon = new Vocabulary();
+
+    // SELECT THE CORRECT LOCATION FROM WHERE TO RETRIEVE THE LEXICON
+    String OUTPUT_LOCATION = stopnostem ? Constants.UNFILTERED_INDEX.toString() : Constants.OUTPUT_DIR.toString();
+    File vocabularyFile = Paths.get(OUTPUT_LOCATION, "lexicon.dat").toFile();
     if (!vocabularyFile.exists()) {
       throw new IOException("Unable to retrieve the vocabulary from the index's file system");
     }
-    BufferedReader vbr = Files.newBufferedReader(vocabularyPath, StandardCharsets.UTF_8);
+    BufferedReader vbr = Files.newBufferedReader(vocabularyFile.toPath(), StandardCharsets.UTF_8);
+
+    // FILL THE VOCABULARY LINE BY LINE
     String line;
     while ((line = vbr.readLine()) != null) {
-      String[] parts = line.split("\t");
-      if (vocabulary.containsKey(parts[0])) {
+      // parse line
+      VocabularyModel model = new VocabularyModel(line);
+
+      if (lexicon.vocabulary.containsKey(model.term)) {
         throw new IOException("Malformed Vocabulary");
       }
-      
-      /* 
-      if(getComponents(parts[1])[1]>=1000000)
-      {
-        System.out.println(parts[0] + " - " + String.format("%,d", getComponents(parts[1])[1]));;
-      }*/
-      vocabulary.put(parts[0], getComponents(parts[1]));
+      lexicon.vocabulary.put(model.term, model);
     }
+
+    // RETURN THE FILLED INSTANCE OF VOCABULARY
+    return lexicon;
   }
 }

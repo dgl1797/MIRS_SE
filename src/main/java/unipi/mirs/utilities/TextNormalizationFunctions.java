@@ -10,11 +10,17 @@ import java.util.HashSet;
 
 import opennlp.tools.stemmer.PorterStemmer;
 
-public final class TextNormalizationFunctions {
+public class TextNormalizationFunctions {
   private TextNormalizationFunctions() {}
 
   public static final PorterStemmer ps = new PorterStemmer();
 
+  /**
+   * applies a regex to clean text and normalizes it
+   * 
+   * @param txt text to be normalized
+   * @return normalized text string
+   */
   public static String cleanText(String txt) {
     // @formatter:off
     return txt.toLowerCase()
@@ -24,6 +30,12 @@ public final class TextNormalizationFunctions {
     // @formatter:on
   }
 
+  /**
+   * loads the stopwords from a stopwords.txt file located in the input directory
+   * 
+   * @return
+   * @throws IOException
+   */
   public static HashSet<String> load_stopwords() throws IOException {
     HashSet<String> stopwords = new HashSet<>();
     Path swPath = Paths.get(Constants.INPUT_DIR.toString(), "stopwords.txt");
@@ -59,5 +71,4 @@ public final class TextNormalizationFunctions {
   //   }
   //   return String.join(" ", stemTokenList);
   // }
-
 }
