@@ -25,7 +25,6 @@ public class SearchEngine {
   private static boolean isTFIDF = true;
   private static boolean stopnostem = false;
   private static boolean pruneactive = false;
-  private static int parsedDocs = 0;
 
   // DATA STRUCTURES
   private static HashSet<String> stopwords = new HashSet<String>();
@@ -180,7 +179,6 @@ public class SearchEngine {
       if (isover)
         break;
     }
-    parsedDocs = maxdocid;
     return top20;
   }
 
@@ -210,7 +208,6 @@ public class SearchEngine {
 
     // heap with the docids actually targeted by the terms' posting lists
     TreeSet<Integer> docids = new TreeSet<>();
-    int lastdocid = 0;
 
     // OPEN THE POSTING LISTS
     for (String w : query.split(" ")) {
@@ -264,20 +261,19 @@ public class SearchEngine {
         }
       }
 
-      // CHECK IF TOP20 LIMIT HAS BEEN REACHED
+      // check if top 20 has to be updated 
       if (top20.size() == 20) {
-        if (top20.last().getValue() < docscore) {
-          // substitute
-          top20.pollLast();
-          top20.add(new AbstractMap.SimpleEntry<String, Double>(doctable.doctable.get(currentdocid).docno, docscore));
+        if (docscore <= top20.last().getValue()) {
+          docids.pollFirst();
+          continue;
         }
-      } else {
-        // simple add
-        top20.add(new AbstractMap.SimpleEntry<String, Double>(doctable.doctable.get(currentdocid).docno, docscore));
+        top20.pollLast();
       }
-      lastdocid = docids.pollFirst();
+      top20.add(new AbstractMap.SimpleEntry<String, Double>(doctable.doctable.get(currentdocid).docno, docscore));
+
+      // remove the parsed docid
+      docids.pollFirst();
     }
-    parsedDocs = lastdocid;
     return top20;
   }
 
@@ -308,6 +304,7 @@ public class SearchEngine {
 
     // heap with the docids actually targeted by the essential terms' posting lists
     TreeSet<Integer> docids = new TreeSet<>();
+    double totalUpperBound = 0;
 
     // OPEN POSTING LISTS
     for (String w : query.split(" ")) {
@@ -322,11 +319,13 @@ public class SearchEngine {
         // update postinglists
         if (alreadyAppeared.containsKey(w)) {
           postinglists.get(alreadyAppeared.get(w)).increaseOccurrences();
+          totalUpperBound += (postinglists.get(alreadyAppeared.get(w)).upperBound);
         } else {
           alreadyAppeared.put(w, postinglists.size());
           postinglists.add(PostingList.openList(w, lexicon.vocabulary.get(w).startByte,
               lexicon.vocabulary.get(w).plLength, stopnostem));
           docids.add(postinglists.get(postinglists.size() - 1).getDocID());
+          totalUpperBound += (postinglists.get(postinglists.size() - 1).upperBound);
         }
       }
     }
@@ -335,7 +334,7 @@ public class SearchEngine {
       return top20;
 
     Collections.sort(postinglists);
-    Double currentThreshold = 0d;
+    double currentThreshold = 0;
 
     // LOOP OVER THE ORDERED POSTING LISTS
     while (!docids.isEmpty()) {
@@ -343,42 +342,55 @@ public class SearchEngine {
       int currentdocid = docids.first();
       double cumulative = 0;
       double docscore = 0;
+      double docupperbound = totalUpperBound;
 
       // check every posting list state
-      for (PostingList pl : postinglists) {
+      for (int i = 0; i < postinglists.size(); i++) {
+        PostingList pl = postinglists.get(i);
         // consider as term's upperbound the sum of all the previous
-        cumulative += (pl.upperBound * pl.occurrences());
-
-        // if it is lower than the currentThreshold just nextgeq to the current docid
-        if (cumulative <= currentThreshold) {
-          pl.nextGEQ(currentdocid);
-        }
-
         if (pl.isover())
           continue;
 
+        cumulative += (pl.upperBound * pl.occurrences());
+
+        // if it is lower than the currentThreshold just nextgeq to the current docid and so if getdocid is lower than currentdocid
+        if (cumulative <= currentThreshold)
+          pl.nextGEQ(currentdocid);
+
         // compute the score when necessary
+        docupperbound -= (pl.upperBound * pl.occurrences());
         if (pl.getDocID() == currentdocid) {
-          docscore += pl.score(doctable.ndocs, doctable.doctable.get(currentdocid).doclen, doctable.avgDocLen);
+          double plscore = pl.score(doctable.ndocs, doctable.doctable.get(currentdocid).doclen, doctable.avgDocLen);
+          docscore += plscore;
+          docupperbound += plscore;
           if (cumulative > currentThreshold && pl.next()) {
             docids.add(pl.getDocID());
           }
+        }
+
+        // IF DOC UPPER BOUND <= CURRENT THRESHOLD, DON'T ITERATE NEXT POSTING LISTS
+        if (docupperbound <= currentThreshold) {
+          for (int j = i + 1; j < postinglists.size(); j++) {
+            pl = postinglists.get(j);
+            // IF DOCID == CURRENT DOCID GO NEXT AND UPDATE DOCIDS WHEN NECESSARY
+            if (pl.getDocID() == currentdocid && cumulative > currentThreshold && pl.next()) {
+              docids.add(pl.getDocID());
+            }
+          }
+          break;
         }
       }
 
       // check if top 20 has to be updated 
       if (top20.size() == 20) {
-        if (docscore > top20.last().getValue()) {
-          // case top 20 is full, replace and update threshold
-          top20.pollLast();
-          top20.add(new AbstractMap.SimpleEntry<String, Double>(doctable.doctable.get(currentdocid).docno, docscore));
-          currentThreshold = top20.last().getValue();
+        if (docscore <= top20.last().getValue()) {
+          docids.pollFirst();
+          continue;
         }
-      } else {
-        // case it is not full yet, just push and update threshold when necessary
-        top20.add(new AbstractMap.SimpleEntry<String, Double>(doctable.doctable.get(currentdocid).docno, docscore));
-        currentThreshold = top20.size() == 20 ? top20.last().getValue() : 0d;
+        top20.pollLast();
       }
+      top20.add(new AbstractMap.SimpleEntry<String, Double>(doctable.doctable.get(currentdocid).docno, docscore));
+      currentThreshold = top20.size() == 20 ? top20.last().getValue() : 0;
 
       // remove the parsed docid
       docids.pollFirst();
@@ -429,7 +441,8 @@ public class SearchEngine {
 
         // PRINT TOP 20
         int position = 0;
-        ConsoleUX.DebugLog("Parsed " + parsedDocs + " documents in " + delta + "ms:");
+
+        ConsoleUX.DebugLog("Parsed a collection of " + doctable.ndocs + " documents in " + delta + "ms:");
         for (Entry<String, Double> doc : top20) {
           ConsoleUX.SuccessLog((++position) + ".\t" + doc.getKey() + " - " + doc.getValue());
         }
