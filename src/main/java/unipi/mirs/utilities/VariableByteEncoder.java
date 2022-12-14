@@ -51,9 +51,11 @@ public class VariableByteEncoder {
     while (bb.position() < bb.capacity()) {
       int currentByte = Byte.toUnsignedInt(bb.get());
       if ((currentByte >> 7) == 0) {
-        n = n * 128 + currentByte;
+        // brings the actual 7 bits string on the left (*128) and adds the current byte to the right
+        n = (n << 7) + currentByte;
       } else {
-        n = 128 * n + (currentByte - 128);
+        // brings the actual 7 bits string on the left (*128) unsetting the first bit
+        n = (n << 7) + (currentByte & 127);
         return n;
       }
     }
