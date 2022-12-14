@@ -372,6 +372,8 @@ public class SearchEngine {
         if (docupperbound <= currentThreshold) {
           for (int j = i + 1; j < postinglists.size(); j++) {
             pl = postinglists.get(j);
+            if (pl.isover())
+              continue;
             // IF DOCID == CURRENT DOCID GO NEXT AND UPDATE DOCIDS WHEN NECESSARY
             if (pl.getDocID() == currentdocid && cumulative > currentThreshold && pl.next()) {
               docids.add(pl.getDocID());
