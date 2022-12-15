@@ -22,10 +22,13 @@ import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream;
 
 import unipi.mirs.components.DocTable;
 import unipi.mirs.components.IndexBuilder;
+import unipi.mirs.components.PostingList;
+import unipi.mirs.components.Vocabulary;
 import unipi.mirs.graphics.ConsoleUX;
 import unipi.mirs.graphics.Menu;
 import unipi.mirs.models.VocabularyModel;
 import unipi.mirs.utilities.Constants;
+import unipi.mirs.utilities.VariableByteEncoder;
 
 public class IndexManager {
   private static final Scanner stdin = new Scanner(System.in);
@@ -289,6 +292,52 @@ public class IndexManager {
     }
   }
 
+  private static void compressIndex() throws IOException {
+    FileInputStream iir = null;
+    try {
+      // LOAD LEXICON
+      Vocabulary lexicon = Vocabulary.loadVocabulary(stopnostem_mode);
+
+      // OPEN INPUT INVERTED INDEX
+      String InputLocation = stopnostem_mode ? Constants.UNFILTERED_INDEX.toString() : Constants.OUTPUT_DIR.toString();
+      File invindex = Paths.get(InputLocation, "inverted_index.dat").toFile();
+      if (!invindex.exists())
+        throw new IOException(stopnostem_mode ? "Unfiltered" : "Filtered" + " Inverted Index file doesn't exist");
+      iir = new FileInputStream(invindex);
+
+      // OPEN OUTPUT FILES
+      File outIndex = Paths.get(Constants.COMPRESSED_INDEX.toString(), "inverted_index.dat").toFile();
+      if (outIndex.exists()) {
+        ConsoleUX.ErrorLog("inverted index already exists, operate in overwrite mode? [Y/n]", "");
+        String answer = stdin.nextLine();
+        if (answer.toLowerCase().equals("n") || answer.toLowerCase().equals("no"))
+          throw new IOException("Aborted by the user");
+        while (!outIndex.delete());
+      }
+      while (!outIndex.createNewFile());
+      File outLexicon = Paths.get(Constants.COMPRESSED_INDEX.toString(), "lexicon.dat").toFile();
+      if (outLexicon.exists()) {
+        while (!outLexicon.delete());
+      }
+      while (!outLexicon.createNewFile());
+
+      // START COMPRESSING POSTING LISTS READING LINE BY LINE AND COPYING IT INTO COMPRESSED_INDEX LOCATION
+      for (String key : lexicon.vocabulary.keySet()) {
+        long startByte = lexicon.vocabulary.get(key).startByte;
+        PostingList pl = PostingList.openList(key, startByte, lexicon.vocabulary.get(key).plLength, stopnostem_mode);
+        ByteBuffer compressedList = VariableByteEncoder.encodeList(pl.getBuffer());
+      }
+
+    } catch (IOException ioe) {
+      ConsoleUX.ErrorLog("Compression Failed:\n" + ioe.getMessage());
+      ConsoleUX.pause(true, stdin);
+    } finally {
+      if (iir != null) {
+        iir.close();
+      }
+    }
+  }
+
   /**
    * Completely clean the data/output directory from files
    */
@@ -327,7 +376,7 @@ public class IndexManager {
       } else if (opt == 1) {
         buildIndex();
       } else if (opt == 2) {
-        // Compression of the inverted index
+        compressIndex();
       } else if (opt == 3) {
         cleanOutput();
       } else if (opt == 4) {

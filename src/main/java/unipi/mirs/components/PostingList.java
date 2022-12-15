@@ -33,6 +33,10 @@ public class PostingList implements Comparable<PostingList> {
     return this.postingList.get(this.postingList.position() + 1);
   }
 
+  public IntBuffer getBuffer() {
+    return this.postingList;
+  }
+
   public void increaseOccurrences() {
     this.occurrences += 1;
   }

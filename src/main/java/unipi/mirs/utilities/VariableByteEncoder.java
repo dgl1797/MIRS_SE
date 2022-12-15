@@ -1,6 +1,7 @@
 package unipi.mirs.utilities;
 
 import java.nio.ByteBuffer;
+import java.nio.IntBuffer;
 import java.util.ArrayList;
 
 public class VariableByteEncoder {
@@ -25,12 +26,14 @@ public class VariableByteEncoder {
     return ByteBuffer.wrap(bb.array());
   }
 
-  public static ByteBuffer encodeList(int... list) {
+  public static ByteBuffer encodeList(IntBuffer list) {
     ArrayList<ByteBuffer> bstream = new ArrayList<>();
 
     // save bytebuffers keeping track of the total number of bytes to be saved
     int nbytes = 0;
-    for (int n : list) {
+
+    while (list.position() < list.capacity()) {
+      int n = list.get();
       ByteBuffer tmp = ByteBuffer.wrap(encode(n).array());
       nbytes += tmp.capacity();
       bstream.add(tmp);
