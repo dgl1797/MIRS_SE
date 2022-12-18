@@ -26,7 +26,6 @@ import unipi.mirs.components.PostingList;
 import unipi.mirs.components.Vocabulary;
 import unipi.mirs.graphics.ConsoleUX;
 import unipi.mirs.graphics.Menu;
-import unipi.mirs.models.SkipList;
 import unipi.mirs.models.VocabularyModel;
 import unipi.mirs.utilities.Constants;
 import unipi.mirs.utilities.VariableByteEncoder;
@@ -298,7 +297,6 @@ public class IndexManager {
     try {
       // LOAD LEXICON
       Vocabulary lexicon = Vocabulary.loadVocabulary(stopnostem_mode);
-      DocTable docTable = DocTable.loadDocTable(stopnostem_mode);
 
       // OPEN INPUT INVERTED INDEX
       String InputLocation = stopnostem_mode ? Constants.UNFILTERED_INDEX.toString() : Constants.OUTPUT_DIR.toString();
@@ -332,7 +330,6 @@ public class IndexManager {
          */
         long startByte = lexicon.vocabulary.get(key).startByte;
         PostingList pl = PostingList.openList(key, startByte, lexicon.vocabulary.get(key).plLength, stopnostem_mode);
-        SkipList sl = SkipList.from(pl.getBuffer());
         ByteBuffer compressedList = VariableByteEncoder.encodeList(pl.getBuffer());
         pl.getBuffer().position(0);
 
