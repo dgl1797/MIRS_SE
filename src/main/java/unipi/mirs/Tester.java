@@ -1,17 +1,15 @@
 package unipi.mirs;
 
-import java.nio.ByteBuffer;
-import java.nio.IntBuffer;
+import java.io.IOException;
 
-import unipi.mirs.utilities.VariableByteEncoder;
+import unipi.mirs.components.DocTable;
+import unipi.mirs.components.Vocabulary;
 
 public class Tester {
-  public static void main(String[] args) {
-    IntBuffer mylist = IntBuffer.wrap(new int[] { 315, 12, 414, 598177674 });
-    ByteBuffer encodedList = VariableByteEncoder.encodeList(mylist);
-    int n = 0;
-    while ((n = VariableByteEncoder.decodeInt(encodedList)) != -1) {
-      System.out.println(n);
-    }
+  public static void main(String[] args) throws IOException {
+    Vocabulary lexicon = Vocabulary.loadVocabulary(true);
+    DocTable dTable = DocTable.loadDocTable(true);
+    final int MAX_BYTE_LEN = (int) Math.ceil(Math.log(dTable.ndocs) / Math.log(128));
+    System.out.println(MAX_BYTE_LEN);
   }
 }

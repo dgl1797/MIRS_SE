@@ -218,7 +218,7 @@ public class IndexManager {
       int nchunks = vb.getNChunks();
       ConsoleUX.DebugLog("Merging " + nchunks + " Chunks...");
       boolean remainingChunk = false;
-      for (int windowsize = nchunks; windowsize > 0; windowsize = (int) Math.floor(windowsize / 2)) {
+      for (int windowsize = nchunks; windowsize > 0; windowsize = ~~(windowsize / 2)) {
         // reset the chunkID to 0
         int assignIndex = 0;
         // windowsize will be the previous windowsize/2 + the eventual odd chunk if windowsize was odd
@@ -297,6 +297,7 @@ public class IndexManager {
     try {
       // LOAD LEXICON
       Vocabulary lexicon = Vocabulary.loadVocabulary(stopnostem_mode);
+      DocTable docTable = DocTable.loadDocTable(stopnostem_mode);
 
       // OPEN INPUT INVERTED INDEX
       String InputLocation = stopnostem_mode ? Constants.UNFILTERED_INDEX.toString() : Constants.OUTPUT_DIR.toString();

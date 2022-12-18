@@ -123,7 +123,7 @@ public class PostingList implements Comparable<PostingList> {
     }
     int leftOffset = this.postingList.position() + postingSize;
     int leftPosition = ((int) (leftOffset) / 2);
-    int middlePosition = ((int) Math.floor((leftPosition + rightPosition) / 2));
+    int middlePosition = (~~((leftPosition + rightPosition) / 2));
     int middleOffset = middlePosition * 2;
 
     while (this.postingList.get(middleOffset) != docid) {
@@ -142,7 +142,7 @@ public class PostingList implements Comparable<PostingList> {
         rightPosition = middlePosition;
         rightOffset = middleOffset;
       }
-      middlePosition = (int) Math.floor((leftPosition + rightPosition) / 2);
+      middlePosition = ~~((leftPosition + rightPosition) / 2);
       middleOffset = middlePosition * 2;
     }
 
