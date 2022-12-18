@@ -26,6 +26,7 @@ import unipi.mirs.components.PostingList;
 import unipi.mirs.components.Vocabulary;
 import unipi.mirs.graphics.ConsoleUX;
 import unipi.mirs.graphics.Menu;
+import unipi.mirs.models.SkipList;
 import unipi.mirs.models.VocabularyModel;
 import unipi.mirs.utilities.Constants;
 import unipi.mirs.utilities.VariableByteEncoder;
@@ -322,13 +323,27 @@ public class IndexManager {
       }
       while (!outLexicon.createNewFile());
 
+      double gain = 0;
       // START COMPRESSING POSTING LISTS READING LINE BY LINE AND COPYING IT INTO COMPRESSED_INDEX LOCATION
       for (String key : lexicon.vocabulary.keySet()) {
+        /**
+         * SKIPS: one every Math.ceil(sqrt(pl.totalLength)) counter resetting every SKIPS Buffer were to accumulate the
+         * informations like an ArrayList of ByteBuffers and a final ByteBuffer where to mix everything.
+         */
         long startByte = lexicon.vocabulary.get(key).startByte;
         PostingList pl = PostingList.openList(key, startByte, lexicon.vocabulary.get(key).plLength, stopnostem_mode);
+        SkipList sl = SkipList.from(pl.getBuffer());
         ByteBuffer compressedList = VariableByteEncoder.encodeList(pl.getBuffer());
-      }
+        pl.getBuffer().position(0);
 
+        // GAIN ANALYSIS
+        double uncompressedSize = pl.getBuffer().capacity() * Integer.BYTES;
+        double compressedSize = compressedList.capacity();
+        gain += (uncompressedSize - compressedSize);
+      }
+      double averageGain = gain / lexicon.vocabulary.keySet().size();
+      ConsoleUX.DebugLog("Total Gain: " + gain + "; Average Gain: " + averageGain + " Bytes");
+      ConsoleUX.pause(true, stdin);
     } catch (IOException ioe) {
       ConsoleUX.ErrorLog("Compression Failed:\n" + ioe.getMessage());
       ConsoleUX.pause(true, stdin);

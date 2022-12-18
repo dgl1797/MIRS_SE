@@ -165,6 +165,10 @@ public class PostingList implements Comparable<PostingList> {
     return occurrences * (1 + (Math.log10(tf))) * (Math.log10((double) ndocs / (double) this.totalLength));
   }
 
+  /**
+   * DEBUG
+   */
+
   @Override
   public int compareTo(PostingList p2) {
     return Double.compare(this.upperBound, p2.upperBound);
