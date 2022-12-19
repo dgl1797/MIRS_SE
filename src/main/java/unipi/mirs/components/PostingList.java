@@ -61,6 +61,13 @@ public class PostingList implements Comparable<PostingList> {
     this.postingList = null;
   }
 
+  public static PostingList from(IntBuffer ib) {
+    PostingList mypostinglist = new PostingList();
+    mypostinglist.postingList = IntBuffer.wrap(ib.array());
+    mypostinglist.totalLength = ~~(mypostinglist.postingList.capacity() / 2);
+    return mypostinglist;
+  }
+
   public static PostingList openList(String term, long startPosition, int plLength, boolean stopnostem)
       throws IOException {
     PostingList postinglist = new PostingList();

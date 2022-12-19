@@ -11,8 +11,11 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.Arrays;
 import java.util.Scanner;
 import java.util.zip.GZIPInputStream;
@@ -20,6 +23,7 @@ import java.util.zip.GZIPInputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream;
 
+import unipi.mirs.components.CompressedPostingList;
 import unipi.mirs.components.DocTable;
 import unipi.mirs.components.IndexBuilder;
 import unipi.mirs.components.PostingList;
@@ -28,7 +32,6 @@ import unipi.mirs.graphics.ConsoleUX;
 import unipi.mirs.graphics.Menu;
 import unipi.mirs.models.VocabularyModel;
 import unipi.mirs.utilities.Constants;
-import unipi.mirs.utilities.VariableByteEncoder;
 
 public class IndexManager {
   private static final Scanner stdin = new Scanner(System.in);
@@ -55,8 +58,16 @@ public class IndexManager {
     fileSystemCreator = Constants.QUERY_FILES.toFile();
     safeCreateDir(fileSystemCreator);
 
-    // CREATE FILTERED_INDEX FOLDER INSIDE OUTPUT FOLDER
+    // CREATE UNFILTERED_INDEX FOLDER INSIDE OUTPUT FOLDER
     fileSystemCreator = Constants.UNFILTERED_INDEX.toFile();
+    safeCreateDir(fileSystemCreator);
+
+    // CREATE COMPRESSED_INDEX FOLDER INSIDE OUTPUT FOLDER
+    fileSystemCreator = Paths.get(Constants.OUTPUT_DIR.toString(), "compressed_index").toFile();
+    safeCreateDir(fileSystemCreator);
+
+    // CREATE COMPRESSED_INDEX FOLDER INSIDE UNFILTERED_INDEX FOLDER
+    fileSystemCreator = Paths.get(Constants.UNFILTERED_INDEX.toString(), "compressed_index").toFile();
     safeCreateDir(fileSystemCreator);
   }
 
@@ -294,19 +305,31 @@ public class IndexManager {
 
   private static void compressIndex() throws IOException {
     FileInputStream iir = null;
+    FileOutputStream iiw = null;
+    BufferedWriter lw = null;
     try {
+      ConsoleUX.DebugLog(ConsoleUX.CLS + "Loading index...");
       // LOAD LEXICON
       Vocabulary lexicon = Vocabulary.loadVocabulary(stopnostem_mode);
 
       // OPEN INPUT INVERTED INDEX
       String InputLocation = stopnostem_mode ? Constants.UNFILTERED_INDEX.toString() : Constants.OUTPUT_DIR.toString();
+      // inverted index
       File invindex = Paths.get(InputLocation, "inverted_index.dat").toFile();
       if (!invindex.exists())
         throw new IOException(stopnostem_mode ? "Unfiltered" : "Filtered" + " Inverted Index file doesn't exist");
       iir = new FileInputStream(invindex);
+      // doctable
+      File dtFile = Paths.get(InputLocation, "doctable.dat").toFile();
+      if (!dtFile.exists())
+        throw new IOException(stopnostem_mode ? "Unfiltered" : "Filtered" + " Inverted Index file doesn't exist");
 
       // OPEN OUTPUT FILES
-      File outIndex = Paths.get(Constants.COMPRESSED_INDEX.toString(), "inverted_index.dat").toFile();
+      String OutputLocation = stopnostem_mode
+          ? Paths.get(Constants.UNFILTERED_INDEX.toString(), "compressed_index").toString()
+          : Paths.get(Constants.OUTPUT_DIR.toString(), "compressed_index").toString();
+      File outIndex = Paths.get(OutputLocation, "inverted_index.dat").toFile();
+      // inverted index
       if (outIndex.exists()) {
         ConsoleUX.ErrorLog("inverted index already exists, operate in overwrite mode? [Y/n]", "");
         String answer = stdin.nextLine();
@@ -315,31 +338,32 @@ public class IndexManager {
         while (!outIndex.delete());
       }
       while (!outIndex.createNewFile());
-      File outLexicon = Paths.get(Constants.COMPRESSED_INDEX.toString(), "lexicon.dat").toFile();
+      // lexicon
+      File outLexicon = Paths.get(OutputLocation, "lexicon.dat").toFile();
       if (outLexicon.exists()) {
         while (!outLexicon.delete());
       }
       while (!outLexicon.createNewFile());
+      // doctable
+      File outDT = Paths.get(OutputLocation, "doctable.dat").toFile();
+      Files.copy(dtFile.toPath(), outDT.toPath(), StandardCopyOption.REPLACE_EXISTING);
 
-      double gain = 0;
+      // Buffers initializations
+      iiw = new FileOutputStream(outIndex);
+      lw = new BufferedWriter(new FileWriter(outLexicon, StandardCharsets.UTF_8));
+
       // START COMPRESSING POSTING LISTS READING LINE BY LINE AND COPYING IT INTO COMPRESSED_INDEX LOCATION
+      ConsoleUX.DebugLog("Compressing Index into: " + OutputLocation);
+      long currentByte = 0;
       for (String key : lexicon.vocabulary.keySet()) {
-        /**
-         * SKIPS: one every Math.ceil(sqrt(pl.totalLength)) counter resetting every SKIPS Buffer were to accumulate the
-         * informations like an ArrayList of ByteBuffers and a final ByteBuffer where to mix everything.
-         */
         long startByte = lexicon.vocabulary.get(key).startByte;
         PostingList pl = PostingList.openList(key, startByte, lexicon.vocabulary.get(key).plLength, stopnostem_mode);
-        ByteBuffer compressedList = VariableByteEncoder.encodeList(pl.getBuffer());
-        pl.getBuffer().position(0);
-
-        // GAIN ANALYSIS
-        double uncompressedSize = pl.getBuffer().capacity() * Integer.BYTES;
-        double compressedSize = compressedList.capacity();
-        gain += (uncompressedSize - compressedSize);
+        CompressedPostingList cpl = CompressedPostingList.from(pl);
+        lw.write(String.format("%s\t%d-%d-%d\n", key, currentByte, cpl.getBuffer().capacity(), pl.totalLength));
+        iiw.write(cpl.getBuffer().array());
+        currentByte += cpl.getBuffer().capacity();
       }
-      double averageGain = gain / lexicon.vocabulary.keySet().size();
-      ConsoleUX.DebugLog("Total Gain: " + gain + "; Average Gain: " + averageGain + " Bytes");
+      ConsoleUX.SuccessLog("Compression Successful");
       ConsoleUX.pause(true, stdin);
     } catch (IOException ioe) {
       ConsoleUX.ErrorLog("Compression Failed:\n" + ioe.getMessage());
@@ -347,6 +371,12 @@ public class IndexManager {
     } finally {
       if (iir != null) {
         iir.close();
+      }
+      if (iiw != null) {
+        iiw.close();
+      }
+      if (lw != null) {
+        lw.close();
       }
     }
   }
