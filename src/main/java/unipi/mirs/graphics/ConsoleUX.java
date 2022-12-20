@@ -78,7 +78,7 @@ public class ConsoleUX {
     try {
       stdin.nextLine();
     } catch (Exception e) {
-      System.out.println("Error handling input" + e.getMessage());
+      System.out.println("Error handling input:\n" + e.getStackTrace().toString());
     }
     if (clear_console) {
       System.out.print(CLS);

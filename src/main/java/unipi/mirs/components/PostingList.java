@@ -52,7 +52,7 @@ public class PostingList implements Comparable<PostingList> {
         return false;
       return true;
     } catch (IndexOutOfBoundsException e) {
-      System.out.println("Error during next() function, array out of bound: " + e.getMessage());
+      ConsoleUX.ErrorLog("Error during next() function, array out of bound:\n" + e.getStackTrace().toString());
     }
     return false;
   }
@@ -102,8 +102,8 @@ public class PostingList implements Comparable<PostingList> {
       // return the posting list instance
       return postinglist;
     } catch (IOException e) {
-      ConsoleUX.ErrorLog(
-          "OpenList function error, cannot open file " + invertedIndexPath.toString() + "\n" + e.getMessage());
+      ConsoleUX.ErrorLog("OpenList function error, cannot open file " + invertedIndexPath.toString() + ":\n"
+          + e.getStackTrace().toString());
       return null;
     }
   }
@@ -171,10 +171,6 @@ public class PostingList implements Comparable<PostingList> {
     int tf = getFreq();
     return occurrences * (1 + (Math.log10(tf))) * (Math.log10((double) ndocs / (double) this.totalLength));
   }
-
-  /**
-   * DEBUG
-   */
 
   @Override
   public int compareTo(PostingList p2) {

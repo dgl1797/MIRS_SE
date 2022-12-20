@@ -451,8 +451,7 @@ public class SearchEngine {
         ConsoleUX.pause(true, stdin);
       }
     } catch (IOException e) {
-      ConsoleUX.ErrorLog("Search failed:");
-      ConsoleUX.ErrorLog(e.getMessage());
+      ConsoleUX.ErrorLog("Search failed:\n" + e.getStackTrace().toString());
     }
   }
 

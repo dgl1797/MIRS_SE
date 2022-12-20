@@ -280,7 +280,7 @@ public class IndexManager {
       ConsoleUX.pause(true, stdin);
 
     } catch (IOException e) {
-      ConsoleUX.ErrorLog("Unable to create index for " + inputFile + ":\n" + e.getMessage());
+      ConsoleUX.ErrorLog("Unable to create index for " + inputFile + ":\n" + e.getStackTrace().toString());
       ConsoleUX.pause(false, stdin);
     } finally {
       try {
@@ -297,7 +297,7 @@ public class IndexManager {
           gis.close();
         }
       } catch (IOException e) {
-        ConsoleUX.ErrorLog("Unable to close file:\n" + e.getMessage());
+        ConsoleUX.ErrorLog("Unable to close file:\n" + e.getStackTrace().toString());
         ConsoleUX.pause(false, stdin);
       }
     }
@@ -366,7 +366,7 @@ public class IndexManager {
       ConsoleUX.SuccessLog("Compression Successful");
       ConsoleUX.pause(true, stdin);
     } catch (IOException ioe) {
-      ConsoleUX.ErrorLog("Compression Failed:\n" + ioe.getMessage());
+      ConsoleUX.ErrorLog("Compression Failed:\n" + ioe.getStackTrace().toString());
       ConsoleUX.pause(true, stdin);
     } finally {
       if (iir != null) {
