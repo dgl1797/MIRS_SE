@@ -288,8 +288,8 @@ public class IndexBuilder {
           break;
         }
         // TAKE LEFT AND RIGHT TERMS AND THEIR RESPECTIVE INFOS
-        VocabularyModel leftmodel = new VocabularyModel(leftTerm);
-        VocabularyModel rightmodel = new VocabularyModel(rightTerm);
+        VocabularyModel leftmodel = new VocabularyModel(leftTerm, false);
+        VocabularyModel rightmodel = new VocabularyModel(rightTerm, false);
 
         if (leftmodel.term.equals(rightmodel.term)) {
           // concatenate right's posting to left's posting
@@ -501,7 +501,7 @@ public class IndexBuilder {
     // LOOP OVER THE REMAINING TERMS IN THE LEXICON TO UPDATE THE TMP FILES
     do {
       // prepare data
-      VocabularyModel model = new VocabularyModel(currentTerm);
+      VocabularyModel model = new VocabularyModel(currentTerm, false);
 
       // save posting list into byte[]
       byte[] pl = invindex.readNBytes(2 * Integer.BYTES * (model.plLength));

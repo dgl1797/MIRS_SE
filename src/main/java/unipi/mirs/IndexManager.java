@@ -141,7 +141,7 @@ public class IndexManager {
     long currentByte = 0;
     while ((terminfos = lr.readLine()) != null) {
       // READ POSTING LIST INTO INT_BUFFER
-      VocabularyModel model = new VocabularyModel(terminfos);
+      VocabularyModel model = new VocabularyModel(terminfos, false);
       ByteBuffer plBuffer = ByteBuffer.wrap(iir.readNBytes(model.plLength * 2 * Integer.BYTES));
       IntBuffer pl = ByteBuffer.wrap(plBuffer.array()).asIntBuffer();
 
@@ -310,7 +310,7 @@ public class IndexManager {
     try {
       ConsoleUX.DebugLog(ConsoleUX.CLS + "Loading index...");
       // LOAD LEXICON
-      Vocabulary lexicon = Vocabulary.loadVocabulary(stopnostem_mode);
+      Vocabulary lexicon = Vocabulary.loadVocabulary(stopnostem_mode, false);
 
       // OPEN INPUT INVERTED INDEX
       String InputLocation = stopnostem_mode ? Constants.UNFILTERED_INDEX.toString() : Constants.OUTPUT_DIR.toString();
@@ -359,9 +359,11 @@ public class IndexManager {
         long startByte = lexicon.vocabulary.get(key).startByte;
         PostingList pl = PostingList.openList(key, startByte, lexicon.vocabulary.get(key).plLength, stopnostem_mode);
         CompressedPostingList cpl = CompressedPostingList.from(pl);
-        lw.write(String.format("%s\t%d-%d-%d\n", key, currentByte, cpl.getBuffer().capacity(), pl.totalLength));
+        lw.write(String.format("%s\t%d-%d-%d\n", key, currentByte, pl.totalLength, cpl.getBuffer().capacity()));
+        ByteBuffer ubb = ByteBuffer.allocate(Double.BYTES).putDouble(pl.upperBound);
+        iiw.write(ubb.array());
         iiw.write(cpl.getBuffer().array());
-        currentByte += cpl.getBuffer().capacity();
+        currentByte += cpl.getBuffer().capacity() + Double.BYTES;
       }
       ConsoleUX.SuccessLog("Compression Successful");
       ConsoleUX.pause(true, stdin);

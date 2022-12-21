@@ -127,7 +127,11 @@ public class PostingList implements Comparable<PostingList> {
 
     if (this.postingList.get(rightOffset - postingSize) < docid) {
       return false;
+    } else if (this.postingList.get(rightOffset - postingSize) == docid) {
+      this.postingList.position(rightOffset - postingSize);
+      return true;
     }
+
     int leftOffset = this.postingList.position() + postingSize;
     int leftPosition = ((int) (leftOffset) / 2);
     int middlePosition = (~~((leftPosition + rightPosition) / 2));

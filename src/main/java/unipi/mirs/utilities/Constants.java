@@ -13,7 +13,6 @@ public class Constants {
   static public Path OUTPUT_DIR = Paths.get(DATA_DIR.toString(), "output");
   static public Path QUERY_FILES = Paths.get(INPUT_DIR.toString(), "queries");
   static public Path UNFILTERED_INDEX = Paths.get(OUTPUT_DIR.toString(), "unfiltered_index");
-  static public Path COMPRESSED_INDEX = Paths.get(OUTPUT_DIR.toString(), "compressed_index");
 
   // CONSTANTS
   static public double K_ONE = 1.2;
