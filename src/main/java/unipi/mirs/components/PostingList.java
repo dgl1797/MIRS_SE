@@ -52,13 +52,20 @@ public class PostingList implements Comparable<PostingList> {
         return false;
       return true;
     } catch (IndexOutOfBoundsException e) {
-      System.out.println("Error during next() function, array out of bound: " + e.getMessage());
+      ConsoleUX.ErrorLog("Error during next() function, array out of bound:\n" + e.getStackTrace().toString());
     }
     return false;
   }
 
   public void close() {
     this.postingList = null;
+  }
+
+  public static PostingList from(IntBuffer ib) {
+    PostingList mypostinglist = new PostingList();
+    mypostinglist.postingList = IntBuffer.wrap(ib.array());
+    mypostinglist.totalLength = ~~(mypostinglist.postingList.capacity() / 2);
+    return mypostinglist;
   }
 
   public static PostingList openList(String term, long startPosition, int plLength, boolean stopnostem)
@@ -95,8 +102,8 @@ public class PostingList implements Comparable<PostingList> {
       // return the posting list instance
       return postinglist;
     } catch (IOException e) {
-      ConsoleUX.ErrorLog(
-          "OpenList function error, cannot open file " + invertedIndexPath.toString() + "\n" + e.getMessage());
+      ConsoleUX.ErrorLog("OpenList function error, cannot open file " + invertedIndexPath.toString() + ":\n"
+          + e.getStackTrace().toString());
       return null;
     }
   }
@@ -120,10 +127,14 @@ public class PostingList implements Comparable<PostingList> {
 
     if (this.postingList.get(rightOffset - postingSize) < docid) {
       return false;
+    } else if (this.postingList.get(rightOffset - postingSize) == docid) {
+      this.postingList.position(rightOffset - postingSize);
+      return true;
     }
+
     int leftOffset = this.postingList.position() + postingSize;
     int leftPosition = ((int) (leftOffset) / 2);
-    int middlePosition = ((int) Math.floor((leftPosition + rightPosition) / 2));
+    int middlePosition = (~~((leftPosition + rightPosition) / 2));
     int middleOffset = middlePosition * 2;
 
     while (this.postingList.get(middleOffset) != docid) {
@@ -142,7 +153,7 @@ public class PostingList implements Comparable<PostingList> {
         rightPosition = middlePosition;
         rightOffset = middleOffset;
       }
-      middlePosition = (int) Math.floor((leftPosition + rightPosition) / 2);
+      middlePosition = ~~((leftPosition + rightPosition) / 2);
       middleOffset = middlePosition * 2;
     }
 

@@ -45,7 +45,8 @@ public class TextNormalizationFunctions {
         stopwords.add(stopword);
       }
     } catch (Exception e) {
-      throw new IOException("Failed to load stopwords file from: " + swPath.toString());
+      throw new IOException(
+          "Failed to load stopwords file from: " + swPath.toString() + ":\n" + e.getStackTrace().toString());
     }
     return stopwords;
   }

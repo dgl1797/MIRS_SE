@@ -6,7 +6,7 @@ import java.util.ArrayList;
 
 public class VariableByteEncoder {
 
-  private static ByteBuffer encode(int n) {
+  public static ByteBuffer encode(int n) {
     ArrayList<Integer> bytes = new ArrayList<>();
 
     // keep looping until there is a n != 0 to be encoded and save the 7 bits representation in the array's head

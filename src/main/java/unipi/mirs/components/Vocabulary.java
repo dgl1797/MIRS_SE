@@ -26,11 +26,14 @@ public class Vocabulary {
    * @return the instance of the vocabulary
    * @throws IOException
    */
-  public static Vocabulary loadVocabulary(boolean stopnostem) throws IOException {
+  public static Vocabulary loadVocabulary(boolean stopnostem, boolean compressed) throws IOException {
     Vocabulary lexicon = new Vocabulary();
 
     // SELECT THE CORRECT LOCATION FROM WHERE TO RETRIEVE THE LEXICON
     String OUTPUT_LOCATION = stopnostem ? Constants.UNFILTERED_INDEX.toString() : Constants.OUTPUT_DIR.toString();
+    if (compressed) {
+      OUTPUT_LOCATION = Paths.get(OUTPUT_LOCATION, "compressed_index").toString();
+    }
     File vocabularyFile = Paths.get(OUTPUT_LOCATION, "lexicon.dat").toFile();
     if (!vocabularyFile.exists()) {
       throw new IOException("Unable to retrieve the vocabulary from the index's file system");
@@ -41,7 +44,7 @@ public class Vocabulary {
     String line;
     while ((line = vbr.readLine()) != null) {
       // parse line
-      VocabularyModel model = new VocabularyModel(line);
+      VocabularyModel model = new VocabularyModel(line, compressed);
 
       if (lexicon.vocabulary.containsKey(model.term)) {
         throw new IOException("Malformed Vocabulary");
