@@ -13,6 +13,7 @@ import opennlp.tools.stemmer.PorterStemmer;
 public class TextNormalizationFunctions {
   private TextNormalizationFunctions() {}
 
+  // initialized as static final to not re-instantiate it at every stemming
   public static final PorterStemmer ps = new PorterStemmer();
 
   /**
@@ -24,8 +25,11 @@ public class TextNormalizationFunctions {
   public static String cleanText(String txt) {
     // @formatter:off
     return txt.toLowerCase()
+    // removes the char+PAD+char sequences used for special utf-8 combinations
         .replaceAll(".\\u0080.", " ")
+    // removes all extra-characters keeping only digits and utf-8 alphabetical characters
         .replaceAll("[^\\p{L}\\w\\s]+", " ")
+    // trims all extra spaces into one
         .replaceAll("[\\s]+", " ").trim();
     // @formatter:on
   }
@@ -45,31 +49,9 @@ public class TextNormalizationFunctions {
         stopwords.add(stopword);
       }
     } catch (Exception e) {
-      throw new IOException(
-          "Failed to load stopwords file from: " + swPath.toString() + ":\n" + e.getStackTrace().toString());
+      throw new IOException("Failed to load stopwords file from: " + swPath.toString() + ":\n" + e.getMessage());
     }
     return stopwords;
   }
 
-  // static public ArrayList<String> tokenize(String txt) {
-  //   ArrayList<String> tokens = new ArrayList<>();
-  //   Collections.addAll(tokens, txt.split(" "));
-  //   return tokens;
-  // }
-
-  // static public ArrayList<String> removeStopwords(String text, HashSet<String> stopwords) {
-  //   ArrayList<String> clean_tokens = tokens;
-  //   clean_tokens.removeAll(stopwords);
-  //   return clean_tokens;
-  // }
-
-  // public String processText(String text) {
-  //   HashSet<String> stopwords = load_stopwords();
-  //   String cleanText = cleanText(text.trim());
-  //   ArrayList<String> stemTokenList = new ArrayList<String>();
-  //   for (String s : removeStopwords(tokenize(cleanText), stopwords)) {
-  //     stemTokenList.add((ps.stem(s)));
-  //   }
-  //   return String.join(" ", stemTokenList);
-  // }
 }

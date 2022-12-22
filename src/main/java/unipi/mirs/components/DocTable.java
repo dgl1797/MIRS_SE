@@ -12,7 +12,7 @@ import unipi.mirs.models.DocTableModel;
 import unipi.mirs.utilities.Constants;
 
 public class DocTable {
-  //[0] is the docno , [1] the doclen
+
   public HashMap<Integer, DocTableModel> doctable = new HashMap<>();
   public int ndocs = 0;
   public double avgDocLen = 0;

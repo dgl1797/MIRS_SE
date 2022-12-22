@@ -1,7 +1,7 @@
 package unipi.mirs.models;
 
 /**
- * Class to just help in the conversion of read data into the correct type instead of using Object class and cast
+ * Data class holding all the necessary information of the vocabulary lines for both compressed and uncompressed formats
  */
 public class VocabularyModel {
   public String term;

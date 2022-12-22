@@ -6,6 +6,12 @@ import java.util.ArrayList;
 
 public class VariableByteEncoder {
 
+  /**
+   * encodes a single integer using VBE
+   * 
+   * @param n the integer to be encoded
+   * @return a ByteBuffer representing the Variable Byte representation of the integer
+   */
   public static ByteBuffer encode(int n) {
     ArrayList<Integer> bytes = new ArrayList<>();
 
@@ -26,12 +32,19 @@ public class VariableByteEncoder {
     return ByteBuffer.wrap(bb.array());
   }
 
+  /**
+   * encodes an entire IntBuffer into the ByteBuffer representing the VBE of the list
+   * 
+   * @param list the integer buffer list to be encoded
+   * @return the byte representation of the intbuffer
+   */
   public static ByteBuffer encodeList(IntBuffer list) {
     ArrayList<ByteBuffer> bstream = new ArrayList<>();
 
     // save bytebuffers keeping track of the total number of bytes to be saved
     int nbytes = 0;
 
+    // loops over the entire intbuffer
     while (list.position() < list.capacity()) {
       int n = list.get();
       ByteBuffer tmp = ByteBuffer.wrap(encode(n).array());
@@ -47,6 +60,12 @@ public class VariableByteEncoder {
     return ByteBuffer.wrap(result.array());
   }
 
+  /**
+   * Decodes a VBE representation of an integer from the passed ByteBuffer advancing its position
+   * 
+   * @param bb the bytebuffer from which to take the next integer to be decoded
+   * @return the decoded integer
+   */
   static public int decodeInt(ByteBuffer bb) {
     int n = 0;
 
