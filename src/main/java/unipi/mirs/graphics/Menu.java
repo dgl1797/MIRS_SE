@@ -16,6 +16,12 @@ public class Menu {
     this.stdin = s;
   }
 
+  /**
+   * Function to print the options and to get the selected output with all error handlings
+   * 
+   * @return the choice as an integer
+   * @throws IOException
+   */
   public int printMenu() throws IOException {
     int choice = 0;
     boolean error = false;

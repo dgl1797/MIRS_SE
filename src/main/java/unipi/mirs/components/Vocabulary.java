@@ -13,7 +13,6 @@ import unipi.mirs.utilities.Constants;
 
 public class Vocabulary {
 
-  //the cell [0] is the docid , into the cell [1] there is the posting list length
   public HashMap<String, VocabularyModel> vocabulary = new HashMap<>();
   public boolean stopnostem;
 

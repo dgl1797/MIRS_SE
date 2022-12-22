@@ -198,6 +198,9 @@ public class SearchEngine {
     return top20;
   }
 
+  /**
+   * Look at conjunctiveSearch's description for details
+   */
   private static TreeSet<Entry<String, Double>> compressedConjunctiveSearch(String query) throws IOException {
     // INITIALIZE THE CORRECT COMPARISON FOR THE DOCUMENTS
     TreeSet<Entry<String, Double>> top20 = new TreeSet<>(new Comparator<Entry<String, Double>>() {
@@ -399,6 +402,9 @@ public class SearchEngine {
     return top20;
   }
 
+  /**
+   * Look at disjunctiveSearch's description for details
+   */
   private static TreeSet<Entry<String, Double>> compressedDisjunctiveSearch(String query) throws IOException {
     TreeSet<Entry<String, Double>> top20 = new TreeSet<>(new Comparator<Entry<String, Double>>() {
       @Override
@@ -606,6 +612,9 @@ public class SearchEngine {
     return top20;
   }
 
+  /**
+   * Look at prunedSearch's description for details
+   */
   private static TreeSet<Entry<String, Double>> compressedPrunedSearch(String query) throws IOException {
     TreeSet<Entry<String, Double>> top20 = new TreeSet<>(new Comparator<Entry<String, Double>>() {
       @Override
@@ -817,6 +826,12 @@ public class SearchEngine {
     doctable = DocTable.loadDocTable(stopnostem);
   }
 
+  /**
+   * Helper Function that selects a file from the input/queries folder
+   * 
+   * @return the selected file's instance
+   * @throws IOException
+   */
   public static File selectQueryInput() throws IOException {
     // TAKE LIST OF FILES INSIDE OF INPUT_DIR FILTERING OUT ALL UNSUPPORTED FILES
     File inputDir = new File(Constants.INPUT_DIR.toString(), "queries");
@@ -841,14 +856,24 @@ public class SearchEngine {
     return inputFile;
   }
 
+  /**
+   * executes a query for each well-formatted line taken from the passed input file, the formatting has to be in the
+   * form: "<qid>\t<query>"
+   * 
+   * @param filePath the path of the query input file
+   * @throws IOException
+   */
   public static void queryWithFile(File filePath) throws IOException {
 
+    // PREPARING DATA INSTANCES
     ConsoleUX.DebugLog(ConsoleUX.CLS + "Processing Query File: ", "");
     ConsoleUX.SuccessLog(filePath.toString());
     String queryline;
     int totQueries = 0;
     int queryProcessed = 0;
     TreeSet<Entry<String, Double>> top20 = new TreeSet<>();
+
+    // FILES HANDLING
     BufferedReader br = new BufferedReader(new FileReader(filePath, StandardCharsets.UTF_8));
     File outputQueryDir = Paths.get(Constants.OUTPUT_DIR.toString(), "queries").toFile();
     File outputQueryFile;
@@ -857,10 +882,12 @@ public class SearchEngine {
       outputQueryDir.mkdir();
     }
 
-    for (int i = 0; (outputQueryFile = Paths.get(outputQueryDir.toString(), String.format("queryOutputFile_%d.tsv", i)).toFile()).exists(); ++i);
+    for (int i = 0; (outputQueryFile = Paths.get(outputQueryDir.toString(), String.format("queryOutputFile_%d.tsv", i))
+        .toFile()).exists(); ++i);
 
     BufferedWriter bw = new BufferedWriter(new FileWriter(outputQueryFile, StandardCharsets.UTF_8));
 
+    // QUERY LOOP OVER THE INPUT FILE
     while ((queryline = br.readLine()) != null) {
       totQueries++;
     }
@@ -868,28 +895,28 @@ public class SearchEngine {
     br = new BufferedReader(new FileReader(filePath, StandardCharsets.UTF_8));
 
     long before = System.currentTimeMillis();
-
     while ((queryline = br.readLine()) != null) {
-
+      // progress output
       if (queryProcessed % 10 == 0) {
         long tmpTime = System.currentTimeMillis() - before;
         ConsoleUX.DebugLog(ConsoleUX.CLS + "Processing Query File: ", "");
         ConsoleUX.SuccessLog(filePath.toString());
         ConsoleUX.DebugLog("Queries processed: ", "");
         ConsoleUX.SuccessLog(queryProcessed + " ", "");
-        ConsoleUX.DebugLog("/ " + totQueries,"");
-        ConsoleUX.DebugLog(" in " +ConsoleUX.FG_CYAN + tmpTime + ConsoleUX.FG_BLUE+ " milliseconds");
+        ConsoleUX.DebugLog("/ " + totQueries, "");
+        ConsoleUX.DebugLog(" in " + ConsoleUX.FG_CYAN + tmpTime + ConsoleUX.FG_BLUE + " milliseconds");
       }
       queryProcessed++;
 
+      // check the queryline formatting
       String[] parts = queryline.split("\t");
-
       if (parts.length < 2)
         continue;
 
       String qid = parts[0];
       String query = parts[1];
 
+      // query selection based on set parameters
       if (isConjunctive) {
         top20 = compressed ? compressedConjunctiveSearch(query) : conjunctiveSearch(query);
       } else if (pruneactive) {
@@ -898,8 +925,8 @@ public class SearchEngine {
         top20 = compressed ? compressedDisjunctiveSearch(query) : disjunctiveSearch(query);
       }
 
+      // printing results into file
       int position = 0;
-
       for (Entry<String, Double> doc : top20) {
         ++position;
         String lineWrite = qid + "\t" + "Q0" + "\t" + doc.getKey() + "\t" + position + "\t" + doc.getValue() + "\n";
@@ -909,12 +936,13 @@ public class SearchEngine {
     }
     long after = System.currentTimeMillis() - before;
 
+    // success output
     ConsoleUX.DebugLog(ConsoleUX.CLS + "Queries processed: ", "");
     ConsoleUX.SuccessLog(queryProcessed + " ", "");
     ConsoleUX.DebugLog("in ", "");
     ConsoleUX.SuccessLog(after + "", "");
     ConsoleUX.DebugLog(" milliseconds");
-    ConsoleUX.DebugLog("Output saved in: " , "");
+    ConsoleUX.DebugLog("Output saved in: ", "");
     ConsoleUX.DebugLog(ConsoleUX.FG_CYAN + outputQueryFile.toString());
     bw.close();
     br.close();

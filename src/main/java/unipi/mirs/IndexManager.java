@@ -69,6 +69,10 @@ public class IndexManager {
     // CREATE COMPRESSED_INDEX FOLDER INSIDE UNFILTERED_INDEX FOLDER
     fileSystemCreator = Paths.get(Constants.UNFILTERED_INDEX.toString(), "compressed_index").toFile();
     safeCreateDir(fileSystemCreator);
+
+    // CREATE OUTPUT FOLDER FOR FILE BASED QUERIES
+    fileSystemCreator = Paths.get(Constants.OUTPUT_DIR.toString(), "queries").toFile();
+    safeCreateDir(fileSystemCreator);
   }
 
   /**
@@ -124,7 +128,7 @@ public class IndexManager {
     BufferedReader lr = new BufferedReader(new FileReader(lexicon));
     FileInputStream iir = new FileInputStream(invindex);
 
-    // CREATE TMPS FILES WHERE TO SAVE NEW INFOS
+    // CREATE TMP FILES WHERE TO SAVE NEW INFOS
     File tmp_lexicon = Paths.get(workingDirectory.toString(), "lexicon_tmp.dat").toFile();
     File tmp_invindex = Paths.get(workingDirectory.toString(), "inverted_index_tmp.dat").toFile();
     if (tmp_lexicon.exists())
@@ -205,7 +209,7 @@ public class IndexManager {
         gis = new GZIPInputStream(new FileInputStream(new File(inputFile)));
         isr = new InputStreamReader(gis);
       } else if (inputFile.matches(".*\\.tar")) {
-        // .tar
+        //.tar
         tais = new TarArchiveInputStream(new FileInputStream(new File(inputFile)));
         tais.getNextEntry();
         isr = new InputStreamReader(tais);
@@ -271,7 +275,7 @@ public class IndexManager {
       while (!lastchunk.renameTo(finalName));
       ConsoleUX.SuccessLog("Merged " + nchunks + " Chunks");
       vb.reset();
-      // endof merge
+      // END OF MERGE
 
       // UPDATE INVERTED INDEX WITH TERMS UPPER BOUNDS
       ConsoleUX.DebugLog("Calculating Upper Bounds...");
@@ -280,7 +284,7 @@ public class IndexManager {
       ConsoleUX.pause(true, stdin);
 
     } catch (IOException e) {
-      ConsoleUX.ErrorLog("Unable to create index for " + inputFile + ":\n" + e.getStackTrace().toString());
+      ConsoleUX.ErrorLog("Unable to create index for " + inputFile + ":\n" + e.getMessage());
       ConsoleUX.pause(false, stdin);
     } finally {
       try {
@@ -297,12 +301,18 @@ public class IndexManager {
           gis.close();
         }
       } catch (IOException e) {
-        ConsoleUX.ErrorLog("Unable to close file:\n" + e.getStackTrace().toString());
+        ConsoleUX.ErrorLog("Unable to close file:\n" + e.getMessage());
         ConsoleUX.pause(false, stdin);
       }
     }
   }
 
+  /**
+   * Reads the index from the correct folder according to the set parameters and compresses it into a sub-folder called
+   * "compressed_index"
+   * 
+   * @throws IOException
+   */
   private static void compressIndex() throws IOException {
     FileInputStream iir = null;
     FileOutputStream iiw = null;
@@ -356,9 +366,14 @@ public class IndexManager {
       ConsoleUX.DebugLog("Compressing Index into: " + OutputLocation);
       long currentByte = 0;
       for (String key : lexicon.vocabulary.keySet()) {
+        // load from files
         long startByte = lexicon.vocabulary.get(key).startByte;
         PostingList pl = PostingList.openList(key, startByte, lexicon.vocabulary.get(key).plLength, stopnostem_mode);
+
+        // compressing the read posting list
         CompressedPostingList cpl = CompressedPostingList.from(pl);
+
+        // writing the compressed data
         lw.write(String.format("%s\t%d-%d-%d\n", key, currentByte, pl.totalLength, cpl.getBuffer().capacity()));
         ByteBuffer ubb = ByteBuffer.allocate(Double.BYTES).putDouble(pl.upperBound);
         iiw.write(ubb.array());
@@ -368,7 +383,7 @@ public class IndexManager {
       ConsoleUX.SuccessLog("Compression Successful");
       ConsoleUX.pause(true, stdin);
     } catch (IOException ioe) {
-      ConsoleUX.ErrorLog("Compression Failed:\n" + ioe.getStackTrace().toString());
+      ConsoleUX.ErrorLog("Compression Failed:\n" + ioe.getMessage());
       ConsoleUX.pause(true, stdin);
     } finally {
       if (iir != null) {
