@@ -1,8 +1,16 @@
 package unipi.mirs;
 
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Paths;
 import java.util.AbstractMap;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -16,6 +24,8 @@ import unipi.mirs.components.DocTable;
 import unipi.mirs.components.PostingList;
 import unipi.mirs.components.Vocabulary;
 import unipi.mirs.graphics.ConsoleUX;
+import unipi.mirs.graphics.Menu;
+import unipi.mirs.utilities.Constants;
 import unipi.mirs.utilities.TextNormalizationFunctions;
 
 public class SearchEngine {
@@ -50,7 +60,8 @@ public class SearchEngine {
     } else if (command.toLowerCase().equals("score")) {
       isTFIDF = pruneactive ? isTFIDF : !isTFIDF;
     } else if (command.toLowerCase().equals("file")) {
-      ConsoleUX.DebugLog("Work in progress");
+      File inputQueryFile = selectQueryInput();
+      queryWithFile(inputQueryFile);
       ConsoleUX.pause(true, stdin);
     } else if (command.toLowerCase().equals("compressed")) {
       compressed = !compressed;
@@ -769,7 +780,7 @@ public class SearchEngine {
         ConsoleUX.pause(true, stdin);
       }
     } catch (IOException e) {
-      ConsoleUX.ErrorLog("Search failed:\n" + e.getStackTrace().toString());
+      ConsoleUX.ErrorLog("Search failed:\n" + e.getMessage().toString());
     }
   }
 
@@ -804,5 +815,108 @@ public class SearchEngine {
 
     // LOAD DOCTABLE
     doctable = DocTable.loadDocTable(stopnostem);
+  }
+
+  public static File selectQueryInput() throws IOException {
+    // TAKE LIST OF FILES INSIDE OF INPUT_DIR FILTERING OUT ALL UNSUPPORTED FILES
+    File inputDir = new File(Constants.INPUT_DIR.toString(), "queries");
+
+    String[] files = Arrays.asList(inputDir.listFiles()).stream().filter((f) -> f.isFile())
+        .filter((f) -> f.toString().matches(".*\\.tsv$")).map(f -> f.toString()).toArray(String[]::new);
+
+    // LOG AN ERROR IN CASE NO COMPATIBLE FILES ARE PRESENT
+    if (Arrays.asList(files).size() == 0) {
+      ConsoleUX.ErrorLog("No files found, make sure to import a [.tsv; .gz; .tar.gz; .tar] file inside "
+          + Constants.INPUT_DIR + " folder");
+      ConsoleUX.pause(true, stdin);
+      return null;
+      // PRINT THE MENU
+    }
+    Menu filesMenu = new Menu(stdin, files);
+
+    // RETURN THE USER'S CHOICE
+    String inputPath = files[filesMenu.printMenu()];
+    ConsoleUX.DebugLog("selected path:" + inputPath);
+    File inputFile = new File(inputPath);
+    return inputFile;
+  }
+
+  public static void queryWithFile(File filePath) throws IOException {
+
+    ConsoleUX.DebugLog(ConsoleUX.CLS + "Processing Query File: ", "");
+    ConsoleUX.SuccessLog(filePath.toString());
+    String queryline;
+    int totQueries = 0;
+    int queryProcessed = 0;
+    TreeSet<Entry<String, Double>> top20 = new TreeSet<>();
+    BufferedReader br = new BufferedReader(new FileReader(filePath, StandardCharsets.UTF_8));
+    File outputQueryDir = Paths.get(Constants.OUTPUT_DIR.toString(), "queries").toFile();
+    File outputQueryFile;
+
+    if (!outputQueryDir.exists()) {
+      outputQueryDir.mkdir();
+    }
+
+    for (int i = 0; (outputQueryFile = Paths.get(outputQueryDir.toString(), String.format("queryOutputFile_%d.tsv", i)).toFile()).exists(); ++i);
+
+    BufferedWriter bw = new BufferedWriter(new FileWriter(outputQueryFile, StandardCharsets.UTF_8));
+
+    while ((queryline = br.readLine()) != null) {
+      totQueries++;
+    }
+    br.close();
+    br = new BufferedReader(new FileReader(filePath, StandardCharsets.UTF_8));
+
+    long before = System.currentTimeMillis();
+
+    while ((queryline = br.readLine()) != null) {
+
+      if (queryProcessed % 10 == 0) {
+        long tmpTime = System.currentTimeMillis() - before;
+        ConsoleUX.DebugLog(ConsoleUX.CLS + "Processing Query File: ", "");
+        ConsoleUX.SuccessLog(filePath.toString());
+        ConsoleUX.DebugLog("Queries processed: ", "");
+        ConsoleUX.SuccessLog(queryProcessed + " ", "");
+        ConsoleUX.DebugLog("/ " + totQueries,"");
+        ConsoleUX.DebugLog(" in " +ConsoleUX.FG_CYAN + tmpTime + ConsoleUX.FG_BLUE+ " milliseconds");
+      }
+      queryProcessed++;
+
+      String[] parts = queryline.split("\t");
+
+      if (parts.length < 2)
+        continue;
+
+      String qid = parts[0];
+      String query = parts[1];
+
+      if (isConjunctive) {
+        top20 = compressed ? compressedConjunctiveSearch(query) : conjunctiveSearch(query);
+      } else if (pruneactive) {
+        top20 = compressed ? compressedPrunedSearch(query) : prunedSearch(query);
+      } else {
+        top20 = compressed ? compressedDisjunctiveSearch(query) : disjunctiveSearch(query);
+      }
+
+      int position = 0;
+
+      for (Entry<String, Double> doc : top20) {
+        ++position;
+        String lineWrite = qid + "\t" + "Q0" + "\t" + doc.getKey() + "\t" + position + "\t" + doc.getValue() + "\n";
+        bw.append(lineWrite);
+      }
+
+    }
+    long after = System.currentTimeMillis() - before;
+
+    ConsoleUX.DebugLog(ConsoleUX.CLS + "Queries processed: ", "");
+    ConsoleUX.SuccessLog(queryProcessed + " ", "");
+    ConsoleUX.DebugLog("in ", "");
+    ConsoleUX.SuccessLog(after + "", "");
+    ConsoleUX.DebugLog(" milliseconds");
+    ConsoleUX.DebugLog("Output saved in: " , "");
+    ConsoleUX.DebugLog(ConsoleUX.FG_CYAN + outputQueryFile.toString());
+    bw.close();
+    br.close();
   }
 }
