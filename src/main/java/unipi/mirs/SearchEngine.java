@@ -60,15 +60,33 @@ public class SearchEngine {
     } else if (command.toLowerCase().equals("score")) {
       isTFIDF = pruneactive ? isTFIDF : !isTFIDF;
     } else if (command.toLowerCase().equals("file")) {
-      File inputQueryFile = selectQueryInput();
-      queryWithFile(inputQueryFile);
+      try {
+        File inputQueryFile = selectQueryInput();
+        queryWithFile(inputQueryFile);
+      } catch (IOException ioe) {
+        ConsoleUX.ErrorLog("Query from file failed:\n" + ioe.getMessage().toString());
+      }
       ConsoleUX.pause(true, stdin);
     } else if (command.toLowerCase().equals("compressed")) {
       compressed = !compressed;
-      loadDataStructures();
+      try {
+        loadDataStructures();
+      } catch (IOException ioe) {
+        ConsoleUX.ErrorLog("Invalid command:\n" + (compressed ? "Compressed" : "Uncompressed") + " Index Not Found");
+        ConsoleUX.pause(true, stdin);
+        compressed = !compressed;
+        loadDataStructures();
+      }
     } else if (command.toLowerCase().equals("filter")) {
       stopnostem = !stopnostem;
-      loadDataStructures();
+      try {
+        loadDataStructures();
+      } catch (IOException ioe) {
+        ConsoleUX.ErrorLog("Invalid command:\n" + (stopnostem ? "Unfiltered" : "Filtered") + " Index Not Found");
+        ConsoleUX.pause(true, stdin);
+        stopnostem = !stopnostem;
+        loadDataStructures();
+      }
     } else if (command.toLowerCase().equals("prune")) {
       pruneactive = !pruneactive;
       isTFIDF = pruneactive ? false : isTFIDF;
@@ -734,7 +752,12 @@ public class SearchEngine {
   public static void main(String[] args) {
     try {
       // SETUP STRUCTURES
-      loadDataStructures();
+      try {
+        loadDataStructures();
+      } catch (IOException ioe) {
+        stopnostem = !stopnostem;
+        loadDataStructures();
+      }
       TreeSet<Entry<String, Double>> top20 = new TreeSet<>();
 
       // PRINT GUIDE
@@ -841,12 +864,10 @@ public class SearchEngine {
 
     // LOG AN ERROR IN CASE NO COMPATIBLE FILES ARE PRESENT
     if (Arrays.asList(files).size() == 0) {
-      ConsoleUX.ErrorLog("No files found, make sure to import a [.tsv; .gz; .tar.gz; .tar] file inside "
-          + Constants.INPUT_DIR + " folder");
-      ConsoleUX.pause(true, stdin);
-      return null;
-      // PRINT THE MENU
+      throw new IOException(
+          "No files found, make sure to import a [.tsv] file inside " + Constants.QUERY_FILES.toString() + " folder");
     }
+    // PRINT THE MENU
     Menu filesMenu = new Menu(stdin, files);
 
     // RETURN THE USER'S CHOICE
