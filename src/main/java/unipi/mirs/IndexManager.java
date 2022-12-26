@@ -257,8 +257,8 @@ public class IndexManager {
           : Constants.OUTPUT_DIR.toString();
       File lastchunk = Paths.get(OUTPUT_LOCATION, "inverted_index_0.dat").toFile();
       if (!lastchunk.exists()) {
-        ConsoleUX
-            .ErrorLog("Unexpected error in the merging phase: " + lastchunk.toString() + " should exist but doesn't");
+        throw new IOException(
+            "Unexpected error in the merging phase: " + lastchunk.toString() + " should exist but doesn't");
       }
       File finalName = Paths.get(OUTPUT_LOCATION, "inverted_index.dat").toFile();
       if (finalName.exists())
@@ -266,8 +266,8 @@ public class IndexManager {
       while (!lastchunk.renameTo(finalName));
       lastchunk = Paths.get(OUTPUT_LOCATION, "lexicon_0.dat").toFile();
       if (!lastchunk.exists()) {
-        ConsoleUX
-            .ErrorLog("Unexpected error in the merging phase: " + lastchunk.toString() + " should exist but doesn't");
+        throw new IOException(
+            "Unexpected error in the merging phase: " + lastchunk.toString() + " should exist but doesn't");
       }
       finalName = Paths.get(OUTPUT_LOCATION, "lexicon.dat").toFile();
       if (finalName.exists())
