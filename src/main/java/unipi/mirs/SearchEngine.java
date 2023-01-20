@@ -911,6 +911,8 @@ public class SearchEngine {
 
     long before = System.currentTimeMillis();
     while ((queryline = br.readLine()) != null) {
+      queryProcessed++;
+
       // check the queryline formatting
       String[] parts = queryline.split("\t");
       if (parts.length < 2)
