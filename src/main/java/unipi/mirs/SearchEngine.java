@@ -885,12 +885,10 @@ public class SearchEngine {
    * @throws IOException
    */
   public static void queryWithFile(File filePath) throws IOException {
-
     // PREPARING DATA INSTANCES
     ConsoleUX.DebugLog(ConsoleUX.CLS + "Processing Query File: ", "");
     ConsoleUX.SuccessLog(filePath.toString());
     String queryline;
-    int totQueries = 0;
     int queryProcessed = 0;
     TreeSet<Entry<String, Double>> top20 = new TreeSet<>();
 
@@ -908,27 +906,11 @@ public class SearchEngine {
 
     BufferedWriter bw = new BufferedWriter(new FileWriter(outputQueryFile, StandardCharsets.UTF_8));
 
-    // QUERY LOOP OVER THE INPUT FILE
-    while ((queryline = br.readLine()) != null) {
-      totQueries++;
-    }
     br.close();
     br = new BufferedReader(new FileReader(filePath, StandardCharsets.UTF_8));
 
     long before = System.currentTimeMillis();
     while ((queryline = br.readLine()) != null) {
-      // progress output
-      if (queryProcessed % 10 == 0) {
-        long tmpTime = System.currentTimeMillis() - before;
-        ConsoleUX.DebugLog(ConsoleUX.CLS + "Processing Query File: ", "");
-        ConsoleUX.SuccessLog(filePath.toString());
-        ConsoleUX.DebugLog("Queries processed: ", "");
-        ConsoleUX.SuccessLog(queryProcessed + " ", "");
-        ConsoleUX.DebugLog("/ " + totQueries, "");
-        ConsoleUX.DebugLog(" in " + ConsoleUX.FG_CYAN + tmpTime + ConsoleUX.FG_BLUE + " milliseconds");
-      }
-      queryProcessed++;
-
       // check the queryline formatting
       String[] parts = queryline.split("\t");
       if (parts.length < 2)
