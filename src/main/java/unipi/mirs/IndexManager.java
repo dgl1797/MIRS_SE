@@ -118,42 +118,48 @@ public class IndexManager {
     DocTable dTable = DocTable.loadDocTable(stopnostem_mode);
     Path workingDirectory = (!stopnostem_mode) ? Constants.OUTPUT_DIR : Constants.UNFILTERED_INDEX;
     File lexicon = Paths.get(workingDirectory.toString(), "lexicon.dat").toFile();
-    File invindex = Paths.get(workingDirectory.toString(), "inverted_index.dat").toFile();
+    File docids = Paths.get(workingDirectory.toString(), "docids.dat").toFile();
+    File frequencies = Paths.get(workingDirectory.toString(), "frequencies.dat").toFile();
     if (!lexicon.exists())
       throw new IOException("Impossible to proceed, lexicon file doesn't exist");
-    if (!invindex.exists())
-      throw new IOException("Impossible to proceed, inverted index file doesn't exist");
+    if (!docids.exists())
+      throw new IOException("Impossible to proceed, inverted documents file doesn't exist");
+    if (!frequencies.exists())
+      throw new IOException("Impossible to proceed, frequencies index file doesn't exist");
 
     // OPENING LEXICON AND INVERTED INDEX
     BufferedReader lr = new BufferedReader(new FileReader(lexicon));
-    FileInputStream iir = new FileInputStream(invindex);
+    FileInputStream didr = new FileInputStream(docids);
+    FileInputStream frqr = new FileInputStream(frequencies);
 
     // CREATE TMP FILES WHERE TO SAVE NEW INFOS
     File tmp_lexicon = Paths.get(workingDirectory.toString(), "lexicon_tmp.dat").toFile();
-    File tmp_invindex = Paths.get(workingDirectory.toString(), "inverted_index_tmp.dat").toFile();
+    File tmp_docids = Paths.get(workingDirectory.toString(), "docids_tmp.dat").toFile();
     if (tmp_lexicon.exists())
       while (!tmp_lexicon.delete());
-    if (tmp_invindex.exists())
-      while (!tmp_invindex.delete());
+    if (tmp_docids.exists())
+      while (!tmp_docids.delete());
     while (!tmp_lexicon.createNewFile());
-    while (!tmp_invindex.createNewFile());
+    while (!tmp_docids.createNewFile());
     BufferedWriter lw = new BufferedWriter(new FileWriter(tmp_lexicon));
-    FileOutputStream iiw = new FileOutputStream(tmp_invindex);
-
+    FileOutputStream didw = new FileOutputStream(tmp_docids);
     // WRITE NEW INFO INTO TMPS
     String terminfos;
     long currentByte = 0;
     while ((terminfos = lr.readLine()) != null) {
       // READ POSTING LIST INTO INT_BUFFER
       VocabularyModel model = new VocabularyModel(terminfos, false);
-      ByteBuffer plBuffer = ByteBuffer.wrap(iir.readNBytes(model.plLength * 2 * Integer.BYTES));
-      IntBuffer pl = ByteBuffer.wrap(plBuffer.array()).asIntBuffer();
+      ByteBuffer didBuffer = ByteBuffer.wrap(didr.readNBytes(model.plLength * Integer.BYTES));
+      IntBuffer did = ByteBuffer.wrap(didBuffer.array()).asIntBuffer();
+
+      ByteBuffer frqBuffer = ByteBuffer.wrap(didr.readNBytes(model.plLength * Integer.BYTES));
+      IntBuffer frq = ByteBuffer.wrap(didBuffer.array()).asIntBuffer();
 
       // EVAL UPPER BOUND
       double upperbound = -1;
-      while (pl.position() < pl.capacity()) {
-        long doclen = dTable.doctable.get(pl.get()).doclen;
-        int tf = pl.get();
+      while (did.position() < did.capacity()) {
+        long doclen = dTable.doctable.get(did.get()).doclen;
+        int tf = frq.get();
         double score = ((tf) / (Constants.K_ONE * ((1 - Constants.B) + (Constants.B * doclen / dTable.avgDocLen)) + tf)
             * Math.log10((double) dTable.ndocs / (double) model.plLength));
         upperbound = score > upperbound ? score : upperbound;
@@ -161,29 +167,30 @@ public class IndexManager {
 
       // WRITE POSTING LIST INTO TMP FILE WITH UPPER BOUND AS INITIAL VALUE
       ByteBuffer ubBuffer = ByteBuffer.allocate(Double.BYTES).putDouble(upperbound);
-      iiw.write(ubBuffer.array());
-      iiw.write(plBuffer.array());
+      didw.write(ubBuffer.array());
+      didw.write(didBuffer.array());
 
       // UPDATE TMP LEXICON
       lw.write(String.format("%s\t%d-%d\n", model.term, currentByte, model.plLength));
-      currentByte += (Double.BYTES + (2 * Integer.BYTES * model.plLength));
+      currentByte += (Double.BYTES + (Integer.BYTES * model.plLength));
     }
 
     // CLOSE STREAMS
+    didr.close();
     lr.close();
-    iir.close();
+    frqr.close();
     lw.close();
-    iiw.close();
+    didw.close();
 
     // DELETE OLD FILES
     while (!lexicon.delete());
-    while (!invindex.delete());
+    while (!docids.delete());
 
     // RENAME TMPS
     File dst = Paths.get(workingDirectory.toString(), "lexicon.dat").toFile();
     while (!tmp_lexicon.renameTo(dst));
-    dst = Paths.get(workingDirectory.toString(), "inverted_index.dat").toFile();
-    while (!tmp_invindex.renameTo(dst));
+    dst = Paths.get(workingDirectory.toString(), "docids.dat").toFile();
+    while (!tmp_docids.renameTo(dst));
   }
 
   /**
@@ -255,21 +262,30 @@ public class IndexManager {
       // RENAME LAST CHUNK TO REMOVE THE _0
       String OUTPUT_LOCATION = stopnostem_mode ? Constants.UNFILTERED_INDEX.toString()
           : Constants.OUTPUT_DIR.toString();
-      File lastchunk = Paths.get(OUTPUT_LOCATION, "inverted_index_0.dat").toFile();
+      File lastchunk_doc = Paths.get(OUTPUT_LOCATION, "docids_0.dat").toFile();
+      File lastchunk_freq = Paths.get(OUTPUT_LOCATION, "frequencies_0.dat").toFile();
+      if (!lastchunk_doc.exists()) {
+        throw new IOException(
+            "Unexpected error in the merging phase: " + lastchunk_doc.toString() + " should exist but doesn't");
+      }
+      if (!lastchunk_freq.exists()) {
+        throw new IOException(
+            "Unexpected error in the merging phase: " + lastchunk_freq.toString() + " should exist but doesn't");
+      }
+      File finalName_doc = Paths.get(OUTPUT_LOCATION, "docids.dat").toFile();
+      File finalName_freq = Paths.get(OUTPUT_LOCATION, "frequencies.dat").toFile();
+      if (finalName_doc.exists())
+        finalName_doc.delete();
+      while (!lastchunk_doc.renameTo(finalName_doc));
+      if (finalName_freq.exists())
+        finalName_freq.delete();
+      while (!lastchunk_freq.renameTo(finalName_freq));
+      File lastchunk = Paths.get(OUTPUT_LOCATION, "lexicon_0.dat").toFile();
       if (!lastchunk.exists()) {
         throw new IOException(
             "Unexpected error in the merging phase: " + lastchunk.toString() + " should exist but doesn't");
       }
-      File finalName = Paths.get(OUTPUT_LOCATION, "inverted_index.dat").toFile();
-      if (finalName.exists())
-        finalName.delete();
-      while (!lastchunk.renameTo(finalName));
-      lastchunk = Paths.get(OUTPUT_LOCATION, "lexicon_0.dat").toFile();
-      if (!lastchunk.exists()) {
-        throw new IOException(
-            "Unexpected error in the merging phase: " + lastchunk.toString() + " should exist but doesn't");
-      }
-      finalName = Paths.get(OUTPUT_LOCATION, "lexicon.dat").toFile();
+      File finalName = Paths.get(OUTPUT_LOCATION, "lexicon.dat").toFile();
       if (finalName.exists())
         finalName.delete();
       while (!lastchunk.renameTo(finalName));

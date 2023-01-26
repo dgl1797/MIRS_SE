@@ -31,7 +31,7 @@ public class IndexBuilder {
   /*opened once for the entire building process*/ private BufferedWriter doctable;
   /*resettable*/ private int currentDocID = 0;
   /*unresettable*/ private int currentChunkID = 0;
-  private static final int CHUNKSIZE = 524_288; // 2^19
+  private static final int CHUNKSIZE = 524_288; // 2^19 number of documents in any chunk
   private String SELECTED_PATH = null;
   private boolean stopnostem = false;
 
@@ -143,8 +143,8 @@ public class IndexBuilder {
         dbgw.write(en.getKey() + "\t");
         dbgw.write("size: " + plLength + " -> ");
       }
-      ByteBuffer didbuffer = ByteBuffer.allocate(plLength);
-      ByteBuffer frqbuffer = ByteBuffer.allocate(plLength);
+      ByteBuffer didbuffer = ByteBuffer.allocate(plLength * Integer.BYTES);
+      ByteBuffer frqbuffer = ByteBuffer.allocate(plLength * Integer.BYTES);
       for (int[] x : en.getValue()) {
         didbuffer.putInt(x[0]);
         frqbuffer.putInt(x[1]);
