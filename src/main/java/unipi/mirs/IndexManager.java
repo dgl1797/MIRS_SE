@@ -152,8 +152,8 @@ public class IndexManager {
       ByteBuffer didBuffer = ByteBuffer.wrap(didr.readNBytes(model.plLength * Integer.BYTES));
       IntBuffer did = ByteBuffer.wrap(didBuffer.array()).asIntBuffer();
 
-      ByteBuffer frqBuffer = ByteBuffer.wrap(didr.readNBytes(model.plLength * Integer.BYTES));
-      IntBuffer frq = ByteBuffer.wrap(didBuffer.array()).asIntBuffer();
+      ByteBuffer frqBuffer = ByteBuffer.wrap(frqr.readNBytes(model.plLength * Integer.BYTES));
+      IntBuffer frq = ByteBuffer.wrap(frqBuffer.array()).asIntBuffer();
 
       // EVAL UPPER BOUND
       double upperbound = -1;
