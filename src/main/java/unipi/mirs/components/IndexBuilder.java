@@ -266,13 +266,15 @@ public class IndexBuilder {
       File[] dbgFiles = debugmode ? getFiles("debug", li, ri) : null;
       File[] lsFiles = getFiles("lexicon", li, ri);
 
-      // OPEN THE STREAMS
+      // OPEN THE STREAM READERS
       BufferedReader[] lexicons = new BufferedReader[] { new BufferedReader(new FileReader(lsFiles[0])),
           new BufferedReader(new FileReader(lsFiles[1])) };
       FileInputStream[] didindexes = new FileInputStream[] { new FileInputStream(didFiles[0]),
           new FileInputStream(didFiles[1]) };
       FileInputStream[] frqindexes = new FileInputStream[] { new FileInputStream(frqFiles[0]),
           new FileInputStream(frqFiles[1]) };
+
+      // OPEN THE STREAM WRITERS
       BufferedWriter newLexicon = new BufferedWriter(new FileWriter(lsFiles[2]));
       BufferedWriter debugWriter = debugmode ? new BufferedWriter(new FileWriter(dbgFiles[2])) : null;
       FileOutputStream newdidIndex = new FileOutputStream(didFiles[2]);
@@ -291,7 +293,7 @@ public class IndexBuilder {
         }
         if (rightTerm == null) {
           // only leftTerms remain
-          loadFileinto(lexicons[0], didindexes[0], frqindexes[1], newLexicon, newdidIndex, newfrqIndex, debugWriter,
+          loadFileinto(lexicons[0], didindexes[0], frqindexes[0], newLexicon, newdidIndex, newfrqIndex, debugWriter,
               currentByte, leftTerm);
           break;
         }
@@ -545,7 +547,7 @@ public class IndexBuilder {
       newfrqIndex.write(gpl);
 
       // prepare next iteration
-      currentByte += dpl.length;
+      currentByte += size;
     } while ((currentTerm = lexicon.readLine()) != null);
   }
 

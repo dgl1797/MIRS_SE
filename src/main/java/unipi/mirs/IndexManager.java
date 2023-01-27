@@ -147,8 +147,9 @@ public class IndexManager {
     String terminfos;
     long currentByte = 0;
     while ((terminfos = lr.readLine()) != null) {
-      // READ POSTING LIST INTO INT_BUFFER
       VocabularyModel model = new VocabularyModel(terminfos, false);
+
+      // READ POSTING LIST INTO INT_BUFFER
       ByteBuffer didBuffer = ByteBuffer.wrap(didr.readNBytes(model.plLength * Integer.BYTES));
       IntBuffer did = ByteBuffer.wrap(didBuffer.array()).asIntBuffer();
 
