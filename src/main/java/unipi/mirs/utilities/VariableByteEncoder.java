@@ -61,6 +61,27 @@ public class VariableByteEncoder {
   }
 
   /**
+   * helper function advancing the bytebuffer to the next skip counting the number of bytes in between
+   * 
+   * @param bb       the bytebuffer to be advanced
+   * @param skipstep the step at which to find the next skip
+   * @return the number of bytes counted between each skip
+   */
+  public static int advance(ByteBuffer bb, int skipstep) {
+    int counter = 0;
+    int nbytes = 0;
+    while (counter < skipstep) {
+      while ((bb.get() & 128) == 0 && bb.position() < bb.capacity())
+        nbytes++;
+      nbytes++;
+      if (bb.position() >= bb.capacity())
+        return nbytes;
+      counter += 1;
+    }
+    return nbytes;
+  }
+
+  /**
    * Decodes a VBE representation of an integer from the passed ByteBuffer advancing its position
    * 
    * @param bb the bytebuffer from which to take the next integer to be decoded
