@@ -14,14 +14,18 @@ import unipi.mirs.utilities.VariableByteEncoder;
 public class CompressedPostingList implements Comparable<CompressedPostingList> {
 
   // PRIVATE DATA
-  private ByteBuffer postingList = null;
+  private ByteBuffer didlist = null;
+  private ByteBuffer frqlist = null;
   private int skipstep;
   private int noccurrences = 0;
   private int DocID = 0;
   private int tf = 0;
-  private int lastSkipPosition = 0;
-  private int lastSkipOffset = 0;
-  private int lastSkipLength = 0;
+  private int dlastSkipPosition = 0;
+  private int dlastSkipOffset = 0;
+  private int dlastSkipLength = 0;
+  private int flastSkipPosition = 0;
+  private int flastSkipOffset = 0;
+  private int flastSkipLength = 0;
   private int resettableStep = 0;
 
   // PUBLIC DATA
@@ -32,12 +36,16 @@ public class CompressedPostingList implements Comparable<CompressedPostingList> 
   private CompressedPostingList() {}
 
   public boolean isover() {
-    return this.postingList.position() >= this.postingList.capacity();
+    return this.didlist.position() >= this.didlist.capacity();
   }
 
   // GETTERS 
-  public ByteBuffer getBuffer() {
-    return this.postingList;
+  public ByteBuffer getDIDBuffer() {
+    return this.didlist;
+  }
+
+  public ByteBuffer getFRQBuffer() {
+    return this.frqlist;
   }
 
   public int getDocID() {
@@ -60,27 +68,6 @@ public class CompressedPostingList implements Comparable<CompressedPostingList> 
   }
 
   /**
-   * helper function advancing the bytebuffer to the next skip counting the number of bytes in between
-   * 
-   * @param bb       the bytebuffer to be advanced
-   * @param skipstep the step at which to find the next skip
-   * @return the number of bytes counted between each skip
-   */
-  private int advance(ByteBuffer bb, int skipstep) {
-    int counter = 0;
-    int nbytes = 0;
-    while (counter < skipstep) {
-      while ((bb.get() & 128) == 0 && bb.position() < bb.capacity())
-        nbytes++;
-      nbytes++;
-      if (bb.position() >= bb.capacity())
-        return nbytes;
-      counter += 1;
-    }
-    return nbytes;
-  }
-
-  /**
    * decodes the next posting and places the cursor to the beginning of the next posting's position resetting at every
    * skipstep the skip data
    * 
@@ -89,19 +76,27 @@ public class CompressedPostingList implements Comparable<CompressedPostingList> 
   public boolean next() {
     try {
       // immediately returns false if the posting list is over
-      if (postingList.position() >= postingList.capacity())
+      if (didlist.position() >= didlist.capacity())
         return false;
 
       // reads the skip data if the buffer is placed on a skip (one every skipstep)
       if (resettableStep == 0) {
-        lastSkipPosition = this.postingList.position();
-        lastSkipOffset = VariableByteEncoder.decodeInt(postingList);
-        lastSkipLength = this.postingList.position() - lastSkipPosition;
+        // for docids
+        dlastSkipPosition = this.didlist.position();
+        dlastSkipOffset = VariableByteEncoder.decodeInt(this.didlist);
+        dlastSkipLength = this.didlist.position() - dlastSkipPosition;
+
+        // for frequencies
+        flastSkipPosition = this.frqlist.position();
+        flastSkipOffset = VariableByteEncoder.decodeInt(this.frqlist);
+        flastSkipLength = this.frqlist.position() - flastSkipPosition;
       }
+
       // reads the posting's docid and term frequency
-      DocID = VariableByteEncoder.decodeInt(postingList);
-      tf = VariableByteEncoder.decodeInt(postingList);
+      DocID = VariableByteEncoder.decodeInt(didlist);
+      tf = VariableByteEncoder.decodeInt(frqlist);
       resettableStep = (resettableStep + 1) % skipstep;
+
       return true;
     } catch (IndexOutOfBoundsException iobe) {
       ConsoleUX.ErrorLog("Error during next() function, array out of bound:\n" + iobe.getMessage().toString());
@@ -117,7 +112,7 @@ public class CompressedPostingList implements Comparable<CompressedPostingList> 
    */
   public boolean nextGEQ(int docid) {
     // immediately stops if the posting list is over
-    if (this.postingList.position() >= this.postingList.capacity())
+    if (this.didlist.position() >= this.didlist.capacity())
       return false;
 
     // returns true without replacing the pointer if the current docid already is >= docid
@@ -127,22 +122,23 @@ public class CompressedPostingList implements Comparable<CompressedPostingList> 
     // LAST DOCID CHECK
 
     // checks the last docid of the posting list to verify the passed argument is inside the posting list 
-    int lastPosition = this.postingList.capacity() - 1;
-    boolean isNotDocid = true;
-    // backwards from last position until the second 1 is caugth
-    while ((this.postingList.get(lastPosition - 1) & 128) == 0 || isNotDocid) {
-      lastPosition -= 1;
-      if ((this.postingList.get(lastPosition) & 128) != 0)
-        isNotDocid = false;
-    }
+    // backwards from last position until 1 is caught
+    int dlastPosition = this.didlist.capacity() - 1;
+    for (; (this.didlist.get(dlastPosition - 1) & 128) == 0; dlastPosition--);
+
+    // same for frequencies
+    int flastPosition = this.frqlist.capacity() - 1;
+    for (; (this.frqlist.get(flastPosition - 1) & 128) == 0; flastPosition--);
+
     // controls the lastdocid decoding a temporary buffer to not alter the postinglist iterator
-    ByteBuffer tmp = this.postingList.slice(lastPosition, this.postingList.capacity() - lastPosition);
+    ByteBuffer tmp = this.didlist.slice(dlastPosition, this.didlist.capacity() - dlastPosition);
     int lastDocID = VariableByteEncoder.decodeInt(tmp);
     if (lastDocID < docid)
       return false;
     // places the iterator on the last item if it is exactly equal to the argument
     if (lastDocID == docid) {
-      this.postingList.position(lastPosition);
+      this.didlist.position(dlastPosition);
+      this.frqlist.position(flastPosition);
       this.resettableStep = 1;
       return next();
     }
@@ -150,8 +146,7 @@ public class CompressedPostingList implements Comparable<CompressedPostingList> 
 
     // CHECK ON NEXT ELEMENT
     // the idea is to not make more iteration than a normal next() if the nextGEQ is the immediately successive docid
-    tmp = this.postingList.slice(this.postingList.position(),
-        Math.min(32, this.postingList.capacity() - this.postingList.position()));
+    tmp = this.didlist.slice(this.didlist.position(), Math.min(32, this.didlist.capacity() - this.didlist.position()));
     if (resettableStep == 0) {
       VariableByteEncoder.decodeInt(tmp);
     }
@@ -162,21 +157,29 @@ public class CompressedPostingList implements Comparable<CompressedPostingList> 
 
     // SKIPPING SEARCH
     // init of the necessary parameters
-    int newposition = this.lastSkipPosition;
-    int oldskiplength = this.lastSkipLength;
-    int oldskipoffset = this.lastSkipOffset;
-    int oldskipposition = newposition;
+    int dnewposition = this.dlastSkipPosition;
+    int doldskiplength = this.dlastSkipLength;
+    int doldskipoffset = this.dlastSkipOffset;
+    int doldskipposition = dnewposition;
+
+    int fnewposition = this.flastSkipPosition;
+    int foldskiplength = this.flastSkipLength;
+    int foldskipoffset = this.flastSkipOffset;
+    int foldskipposition = fnewposition;
+
     int reachedDocID = this.DocID;
     do {
       // resets the step if a skip there was another iteration before (newposition != lastskipposition)
-      if (newposition != this.lastSkipPosition) {
+      if (dnewposition != this.dlastSkipPosition) {
         this.resettableStep = 0;
-        this.postingList.position(newposition);
+        this.didlist.position(dnewposition);
+        this.frqlist.position(fnewposition);
       }
 
       // places the newposition to the next skip
-      newposition = oldskiplength + oldskipoffset + oldskipposition;
-      if (newposition >= this.postingList.capacity()) {
+      dnewposition = doldskiplength + doldskipoffset + doldskipposition;
+      fnewposition = foldskiplength + foldskipoffset + foldskipposition;
+      if (dnewposition >= this.didlist.capacity()) {
         // LINEAR SEARCH OVER REMAINING DOCIDS
         while (next()) {
           if (this.DocID >= docid)
@@ -187,18 +190,25 @@ public class CompressedPostingList implements Comparable<CompressedPostingList> 
       }
 
       // performs checks on a tmp slice of the posting list to not alter its iterator
-      tmp = this.postingList.slice(newposition, Math.min(32, this.postingList.capacity() - newposition));
-      oldskiplength = tmp.position();
-      oldskipoffset = VariableByteEncoder.decodeInt(tmp);
-      oldskiplength = tmp.position() - oldskiplength;
+      tmp = this.didlist.slice(dnewposition, Math.min(32, this.didlist.capacity() - dnewposition));
+      doldskiplength = tmp.position();
+      doldskipoffset = VariableByteEncoder.decodeInt(tmp);
+      doldskiplength = tmp.position() - doldskiplength;
       reachedDocID = VariableByteEncoder.decodeInt(tmp);
-      oldskipposition = newposition;
+      doldskipposition = dnewposition;
       // checks if the docid has been reached on the skip position
       if (reachedDocID == docid) {
-        this.postingList.position(newposition);
+        this.didlist.position(dnewposition);
+        this.frqlist.position(fnewposition);
         this.resettableStep = 0;
         return next();
       }
+      // also updates the frequency skipping informations
+      tmp = this.frqlist.slice(fnewposition, Math.min(32, this.frqlist.capacity() - fnewposition));
+      foldskiplength = tmp.position();
+      foldskipoffset = VariableByteEncoder.decodeInt(tmp);
+      foldskiplength = tmp.position() - doldskiplength;
+      foldskipposition = fnewposition;
     } while (reachedDocID < docid);
 
     // linear searches between the < and the >= skips to find the nextGEQ
@@ -223,8 +233,8 @@ public class CompressedPostingList implements Comparable<CompressedPostingList> 
    * @return the instance of the compressed posting list
    * @throws IOException
    */
-  public static CompressedPostingList openList(String term, long startByte, int endByte, int plLength,
-      boolean stopnostem) throws IOException {
+  public static CompressedPostingList openList(String term, long dstartByte, int dendByte, long fstartByte,
+      int fendByte, int plLength, boolean stopnostem) throws IOException {
     CompressedPostingList cpl = new CompressedPostingList();
 
     // INITS THE BASIC DATA FOR THE POSTING LIST
@@ -234,34 +244,62 @@ public class CompressedPostingList implements Comparable<CompressedPostingList> 
     cpl.noccurrences = 1;
 
     // FILE SELECTION BASED ON FILTER SET
-    final File INV_IND_FILE = Paths
+    final File DID_FILE = Paths
         .get(stopnostem ? Constants.UNFILTERED_INDEX.toString() : Constants.OUTPUT_DIR.toString(), "compressed_index",
-            "inverted_index.dat")
+            "docids.dat")
+        .toFile();
+    final File FRQ_FILE = Paths
+        .get(stopnostem ? Constants.UNFILTERED_INDEX.toString() : Constants.OUTPUT_DIR.toString(), "compressed_index",
+            "frequencies.dat")
         .toFile();
 
-    try (FileInputStream fileInvInd = new FileInputStream(INV_IND_FILE)) {
+    FileInputStream didr = null;
+    FileInputStream frqr = null;
+
+    try {
+      didr = new FileInputStream(DID_FILE);
+      frqr = new FileInputStream(FRQ_FILE);
+
       // skips to the startbyte
-      fileInvInd.skip(startByte);
+      didr.skip(dstartByte);
+      frqr.skip(fstartByte);
+
       // reads a double
-      cpl.upperBound = ByteBuffer.wrap(fileInvInd.readNBytes(Double.BYTES)).asDoubleBuffer().get();
+      cpl.upperBound = ByteBuffer.wrap(didr.readNBytes(Double.BYTES)).asDoubleBuffer().get();
       // reads endbyte bytes
-      byte[] pl = new byte[endByte];
-      fileInvInd.read(pl);
+      byte[] dl = new byte[dendByte];
+      byte[] fl = new byte[fendByte];
+      didr.read(dl);
+      frqr.read(fl);
 
       // instantiates the buffer information for the posting list
-      cpl.postingList = ByteBuffer.wrap(pl);
-      cpl.lastSkipPosition = 0;
-      cpl.lastSkipOffset = VariableByteEncoder.decodeInt(cpl.postingList);
-      cpl.lastSkipLength = cpl.postingList.position() - cpl.lastSkipPosition;
-      cpl.DocID = VariableByteEncoder.decodeInt(cpl.postingList);
-      cpl.tf = VariableByteEncoder.decodeInt(cpl.postingList);
+      cpl.didlist = ByteBuffer.wrap(dl);
+      cpl.dlastSkipPosition = 0;
+      cpl.dlastSkipOffset = VariableByteEncoder.decodeInt(cpl.didlist);
+      cpl.dlastSkipLength = cpl.didlist.position() - cpl.dlastSkipPosition;
+
+      cpl.frqlist = ByteBuffer.wrap(fl);
+      cpl.flastSkipPosition = 0;
+      cpl.flastSkipOffset = VariableByteEncoder.decodeInt(cpl.frqlist);
+      cpl.flastSkipLength = cpl.frqlist.position() - cpl.flastSkipPosition;
+
+      cpl.DocID = VariableByteEncoder.decodeInt(cpl.didlist);
+      cpl.tf = VariableByteEncoder.decodeInt(cpl.frqlist);
       cpl.resettableStep = 1;
-      return cpl;
+
     } catch (IOException ioe) {
-      ConsoleUX.ErrorLog(
-          "OpenList function error, cannot open file " + INV_IND_FILE.toString() + ":\n" + ioe.getMessage().toString());
-      return null;
+      ConsoleUX.ErrorLog("OpenList function error, cannot open file " + DID_FILE.toString() + " or "
+          + FRQ_FILE.toString() + ":\n" + ioe.getMessage().toString());
+      cpl = null;
+    } finally {
+      if (didr != null) {
+        didr.close();
+      }
+      if (frqr != null) {
+        frqr.close();
+      }
     }
+    return cpl;
   }
 
   /**
@@ -274,34 +312,58 @@ public class CompressedPostingList implements Comparable<CompressedPostingList> 
 
     // INITIALIZES COMPRESSION PARAMETERS
     int skipstep = (int) Math.ceil(Math.sqrt(pl.totalLength));
-    ByteBuffer compressedList = VariableByteEncoder.encodeList(pl.getBuffer());
-    ByteBuffer tmp = ByteBuffer.wrap(compressedList.array());
-    ArrayList<ByteBuffer> chunks = new ArrayList<>();
+    ByteBuffer compressedDIDList = VariableByteEncoder.encodeList(pl.getDIDBuffer());
+    ByteBuffer compressedFRQList = VariableByteEncoder.encodeList(pl.getFRQBuffer());
+    ByteBuffer dtmp = ByteBuffer.wrap(compressedDIDList.array());
+    ByteBuffer ftmp = ByteBuffer.wrap(compressedFRQList.array());
+    ArrayList<ByteBuffer> dchunks = new ArrayList<>();
+    ArrayList<ByteBuffer> fchunks = new ArrayList<>();
+
     CompressedPostingList result = new CompressedPostingList();
-    int totalBytes = 0;
+
+    int dtotalBytes = 0;
+    int ftotalBytes = 0;
+
     result.skipstep = skipstep;
 
     // INITIALIZES THE CHUNKS BETWEEN CONSEQUENT SKIPS AND PUTS THEM INTO THE ARRAY
-    while (tmp.position() < tmp.capacity()) {
-      int lastSkipOffset = result.advance(tmp, 2 * skipstep);
+    while (dtmp.position() < dtmp.capacity()) {
+      int dlastSkipOffset = VariableByteEncoder.advance(dtmp, skipstep);
+      int flastSkipOffset = VariableByteEncoder.advance(ftmp, skipstep);
 
       // the skip is generated as an offset from the current position where to jump compressed using VBE
-      ByteBuffer encodedOffset = VariableByteEncoder.encode(lastSkipOffset);
-      ByteBuffer chunk = ByteBuffer.allocate(lastSkipOffset + encodedOffset.capacity());
-      chunk.put(encodedOffset).put(compressedList.slice(compressedList.position(), lastSkipOffset));
+      ByteBuffer encodedOffset = VariableByteEncoder.encode(dlastSkipOffset);
+      ByteBuffer chunk = ByteBuffer.allocate(dlastSkipOffset + encodedOffset.capacity());
+      chunk.put(encodedOffset).put(compressedDIDList.slice(compressedDIDList.position(), dlastSkipOffset));
       // resets the bytebuffer iterator before pushing it
       chunk.position(0);
-      chunks.add(chunk);
-      totalBytes += chunk.capacity();
-      compressedList.position(compressedList.position() + lastSkipOffset);
+      dchunks.add(ByteBuffer.wrap(chunk.array()));
+      dtotalBytes += chunk.capacity();
+
+      encodedOffset = VariableByteEncoder.encode(flastSkipOffset);
+      chunk = ByteBuffer.allocate(flastSkipOffset + encodedOffset.capacity());
+      chunk.put(encodedOffset).put(compressedFRQList.slice(compressedFRQList.position(), flastSkipOffset));
+      chunk.position(0);
+      fchunks.add(ByteBuffer.wrap(chunk.array()));
+      ftotalBytes += chunk.capacity();
+
+      compressedDIDList.position(compressedDIDList.position() + dlastSkipOffset);
+      compressedFRQList.position(compressedFRQList.position() + flastSkipOffset);
     }
 
     // allocates the resulting array into the instance's bytebuffer
-    result.postingList = ByteBuffer.allocate(totalBytes);
-    for (ByteBuffer i : chunks) {
-      result.postingList.put(i);
+    result.didlist = ByteBuffer.allocate(dtotalBytes);
+    result.frqlist = ByteBuffer.allocate(ftotalBytes);
+
+    for (ByteBuffer i : dchunks) {
+      result.didlist.put(i);
     }
-    result.postingList.position(0);
+    result.didlist.position(0);
+
+    for (ByteBuffer i : fchunks) {
+      result.frqlist.put(i);
+    }
+    result.frqlist.position(0);
 
     return result;
   }

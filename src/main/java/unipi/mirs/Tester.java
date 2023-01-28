@@ -1,27 +1,26 @@
 package unipi.mirs;
 
-import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.IntBuffer;
-import java.nio.file.Paths;
 
-import unipi.mirs.utilities.Constants;
+import unipi.mirs.components.CompressedPostingList;
+import unipi.mirs.components.PostingList;
+import unipi.mirs.components.Vocabulary;
+import unipi.mirs.models.VocabularyModel;
 
 public class Tester {
   public static void main(String[] args) throws IOException {
-    FileInputStream frqr = new FileInputStream(
-        new File(Paths.get(Constants.UNFILTERED_INDEX.toString(), "frequencies.dat").toString()));
+    boolean stopnostem = false;
+    boolean compressed = false;
 
-    IntBuffer fib = ByteBuffer.wrap(frqr.readAllBytes()).asIntBuffer();
-    int maxfreq = -1;
-    while (fib.position() < fib.capacity()) {
-      int x = fib.get();
-      if (x > maxfreq) {
-        maxfreq = x;
-      }
-    }
-    System.out.println(String.format("max frequency: %d", maxfreq));
+    Vocabulary lexicon = Vocabulary.loadVocabulary(stopnostem, compressed);
+    VocabularyModel vm = lexicon.vocabulary.get("hello");
+
+    PostingList hellolist = PostingList.openList(vm.term, vm.dstartByte, vm.fstartByte, vm.plLength, false);
+    CompressedPostingList chellolist = CompressedPostingList.from(hellolist);
+
+    System.out.println(chellolist.totalLength);
+    System.out.println(chellolist.upperBound);
+    System.out.println(chellolist.getDIDBuffer().capacity());
+    System.out.println(chellolist.getFRQBuffer().capacity());
   }
 }
