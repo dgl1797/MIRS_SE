@@ -104,4 +104,25 @@ public class VariableByteEncoder {
     }
     return -1; // endof stream
   }
+
+  /**
+   * helper function advancing the bytebuffer to the next skip counting the number of bytes in between
+   * 
+   * @param bb       the bytebuffer to be advanced
+   * @param skipstep the step at which to find the next skip
+   * @return the number of bytes counted between each skip
+   */
+  public static int advance(ByteBuffer bb, int skipstep) {
+    int counter = 0;
+    int nbytes = 0;
+    while (counter < skipstep) {
+      while ((bb.get() & 128) == 0 && bb.position() < bb.capacity())
+        nbytes++;
+      nbytes++;
+      if (bb.position() >= bb.capacity())
+        return nbytes;
+      counter += 1;
+    }
+    return nbytes;
+  }
 }

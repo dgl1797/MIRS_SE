@@ -142,8 +142,8 @@ public class SearchEngine {
         if (pls.containsKey(w)) {
           pls.get(w).increaseOccurrences();
         } else {
-          pls.put(w, PostingList.openList(w, lexicon.vocabulary.get(w).startByte, lexicon.vocabulary.get(w).plLength,
-              stopnostem));
+          pls.put(w, PostingList.openList(w, lexicon.vocabulary.get(w).dstartByte, lexicon.vocabulary.get(w).fstartByte,
+              lexicon.vocabulary.get(w).plLength, stopnostem));
 
           // check if the opened docid is greater than maxdocid
           int currentdocid = pls.get(w).getDocID();
@@ -254,8 +254,10 @@ public class SearchEngine {
         if (pls.containsKey(w)) {
           pls.get(w).increaseOccurrences();
         } else {
-          pls.put(w, CompressedPostingList.openList(w, lexicon.vocabulary.get(w).startByte,
-              lexicon.vocabulary.get(w).endByte, lexicon.vocabulary.get(w).plLength, stopnostem));
+          pls.put(w,
+              CompressedPostingList.openList(w, lexicon.vocabulary.get(w).dstartByte,
+                  lexicon.vocabulary.get(w).dendByte, lexicon.vocabulary.get(w).fstartByte,
+                  lexicon.vocabulary.get(w).fendByte, lexicon.vocabulary.get(w).plLength, stopnostem));
 
           // check if the opened docid is greater than maxdocid
           int currentdocid = pls.get(w).getDocID();
@@ -370,8 +372,8 @@ public class SearchEngine {
         if (pls.containsKey(w)) {
           pls.get(w).increaseOccurrences();
         } else {
-          pls.put(w, PostingList.openList(w, lexicon.vocabulary.get(w).startByte, lexicon.vocabulary.get(w).plLength,
-              stopnostem));
+          pls.put(w, PostingList.openList(w, lexicon.vocabulary.get(w).dstartByte, lexicon.vocabulary.get(w).fstartByte,
+              lexicon.vocabulary.get(w).plLength, stopnostem));
           docids.add(pls.get(w).getDocID());
         }
       }
@@ -457,8 +459,10 @@ public class SearchEngine {
         if (pls.containsKey(w)) {
           pls.get(w).increaseOccurrences();
         } else {
-          pls.put(w, CompressedPostingList.openList(w, lexicon.vocabulary.get(w).startByte,
-              lexicon.vocabulary.get(w).endByte, lexicon.vocabulary.get(w).plLength, stopnostem));
+          pls.put(w,
+              CompressedPostingList.openList(w, lexicon.vocabulary.get(w).dstartByte,
+                  lexicon.vocabulary.get(w).dendByte, lexicon.vocabulary.get(w).fstartByte,
+                  lexicon.vocabulary.get(w).fendByte, lexicon.vocabulary.get(w).plLength, stopnostem));
           docids.add(pls.get(w).getDocID());
         }
       }
@@ -551,8 +555,8 @@ public class SearchEngine {
           totalUpperBound += (postinglists.get(alreadyAppeared.get(w)).upperBound);
         } else {
           alreadyAppeared.put(w, postinglists.size());
-          postinglists.add(PostingList.openList(w, lexicon.vocabulary.get(w).startByte,
-              lexicon.vocabulary.get(w).plLength, stopnostem));
+          postinglists.add(PostingList.openList(w, lexicon.vocabulary.get(w).dstartByte,
+              lexicon.vocabulary.get(w).fstartByte, lexicon.vocabulary.get(w).plLength, stopnostem));
           docids.add(postinglists.get(postinglists.size() - 1).getDocID());
           totalUpperBound += (postinglists.get(postinglists.size() - 1).upperBound);
         }
@@ -670,8 +674,9 @@ public class SearchEngine {
           totalUpperBound += (postinglists.get(alreadyAppeared.get(w)).upperBound);
         } else {
           alreadyAppeared.put(w, postinglists.size());
-          postinglists.add(CompressedPostingList.openList(w, lexicon.vocabulary.get(w).startByte,
-              lexicon.vocabulary.get(w).endByte, lexicon.vocabulary.get(w).plLength, stopnostem));
+          postinglists.add(CompressedPostingList.openList(w, lexicon.vocabulary.get(w).dstartByte,
+              lexicon.vocabulary.get(w).dendByte, lexicon.vocabulary.get(w).fstartByte,
+              lexicon.vocabulary.get(w).fendByte, lexicon.vocabulary.get(w).plLength, stopnostem));
           docids.add(postinglists.get(postinglists.size() - 1).getDocID());
           totalUpperBound += (postinglists.get(postinglists.size() - 1).upperBound);
         }

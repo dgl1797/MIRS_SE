@@ -13,8 +13,8 @@ import unipi.mirs.utilities.Constants;
 public class PostingList implements Comparable<PostingList> {
 
   // PRIVATE DATA
-  private final int postingSize = 2;
-  private IntBuffer postingList = null;
+  private IntBuffer didlist = null;
+  private IntBuffer frqlist = null;
   private int occurrences = 0;
 
   // PUBLIC DATA
@@ -25,20 +25,28 @@ public class PostingList implements Comparable<PostingList> {
   private PostingList() {}
 
   // GETTERS
-  public int getPointer() {
-    return this.postingList.position();
+  public int getDIDPointer() {
+    return this.didlist.position();
+  }
+
+  public int getFRQPointer() {
+    return this.frqlist.position();
   }
 
   public int getDocID() {
-    return this.postingList.get(this.postingList.position());
+    return this.didlist.get(this.didlist.position());
   }
 
   public int getFreq() {
-    return this.postingList.get(this.postingList.position() + 1);
+    return this.frqlist.get(this.frqlist.position());
   }
 
-  public IntBuffer getBuffer() {
-    return this.postingList;
+  public IntBuffer getDIDBuffer() {
+    return this.didlist;
+  }
+
+  public IntBuffer getFRQBuffer() {
+    return this.frqlist;
   }
 
   public int occurrences() {
@@ -53,7 +61,8 @@ public class PostingList implements Comparable<PostingList> {
   }
 
   public void close() {
-    this.postingList = null;
+    this.didlist = null;
+    this.frqlist = null;
   }
 
   /**
@@ -61,11 +70,15 @@ public class PostingList implements Comparable<PostingList> {
    * 
    * @param ib the intbuffer
    * @return the posting list instance created
+   * @throws IOException
    */
-  public static PostingList from(IntBuffer ib) {
+  public static PostingList from(IntBuffer didb, IntBuffer frqb) throws IOException {
     PostingList mypostinglist = new PostingList();
-    mypostinglist.postingList = IntBuffer.wrap(ib.array());
-    mypostinglist.totalLength = ~~(mypostinglist.postingList.capacity() / 2);
+    mypostinglist.didlist = IntBuffer.wrap(didb.array());
+    mypostinglist.frqlist = IntBuffer.wrap(frqb.array());
+    if (mypostinglist.didlist.capacity() != mypostinglist.frqlist.capacity())
+      throw new IOException("Capacities missmatching");
+    mypostinglist.totalLength = mypostinglist.didlist.capacity();
     return mypostinglist;
   }
 
@@ -79,8 +92,8 @@ public class PostingList implements Comparable<PostingList> {
    * @return the Posting list instance
    * @throws IOException
    */
-  public static PostingList openList(String term, long startPosition, int plLength, boolean stopnostem)
-      throws IOException {
+  public static PostingList openList(String term, long dstartPosition, long fstartPosition, int plLength,
+      boolean stopnostem) throws IOException {
 
     // INITIALIZE BASIC PARAMETERS OF THE INSTANCE
     PostingList postinglist = new PostingList();
@@ -88,33 +101,50 @@ public class PostingList implements Comparable<PostingList> {
     postinglist.term = term;
 
     // TAKE THE POSTING LIST FROM THE CORRECT FILE
-    int bytelength = plLength * 2 * Integer.BYTES;
-    byte[] pl = new byte[bytelength];
-    String invertedIndexStr = "inverted_index.dat";
+    int bytelength = plLength * Integer.BYTES;
+    byte[] dl = new byte[bytelength];
+    byte[] fl = new byte[bytelength];
+
+    // SET THE FILE PATHS
     String OUTPUT_LOCATION = stopnostem ? Constants.UNFILTERED_INDEX.toString() : Constants.OUTPUT_DIR.toString();
-    Path invertedIndexPath = Paths.get(OUTPUT_LOCATION, invertedIndexStr);
+    Path didPath = Paths.get(OUTPUT_LOCATION, "docids.dat");
+    Path frqPath = Paths.get(OUTPUT_LOCATION, "frequencies.dat");
+
+    FileInputStream didr = null;
+    FileInputStream frqr = null;
 
     // READ THE STREAM
-    try (FileInputStream fileInvInd = new FileInputStream(invertedIndexPath.toString())) {
+    try {
+      didr = new FileInputStream(didPath.toString());
+      frqr = new FileInputStream(frqPath.toString());
 
       // skip to the start position
-      fileInvInd.skip(startPosition);
+      didr.skip(dstartPosition);
+      frqr.skip(fstartPosition);
 
       // read the upperbound
-      postinglist.upperBound = ByteBuffer.wrap(fileInvInd.readNBytes(Double.BYTES)).asDoubleBuffer().get();
+      postinglist.upperBound = ByteBuffer.wrap(didr.readNBytes(Double.BYTES)).asDoubleBuffer().get();
 
-      // read the postinglist
-      fileInvInd.read(pl);
-      postinglist.postingList = ByteBuffer.wrap(pl).asIntBuffer();
+      // read the docids list
+      didr.read(dl);
+      postinglist.didlist = ByteBuffer.wrap(dl).asIntBuffer();
       postinglist.totalLength = plLength;
 
-      // return the posting list instance
-      return postinglist;
+      // read the frequencies list
+      frqr.read(fl);
+      postinglist.frqlist = ByteBuffer.wrap(fl).asIntBuffer();
     } catch (IOException e) {
-      ConsoleUX.ErrorLog("OpenList function error, cannot open file " + invertedIndexPath.toString() + ":\n"
-          + e.getStackTrace().toString());
-      return null;
+      ConsoleUX.ErrorLog("OpenList function error, cannot open file " + didPath.toString() + " or " + frqPath.toString()
+          + ":\n" + e.getStackTrace().toString());
+      postinglist = null;
+    } finally {
+      if (didr != null)
+        didr.close();
+      if (frqr != null)
+        frqr.close();
     }
+    // return the posting list instance
+    return postinglist;
   }
 
   /**
@@ -124,8 +154,9 @@ public class PostingList implements Comparable<PostingList> {
    */
   public boolean next() {
     try {
-      this.postingList.position(this.postingList.position() + postingSize);
-      if (this.postingList.position() >= (this.totalLength * 2))
+      this.didlist.get();
+      this.frqlist.get();
+      if (this.didlist.position() >= (this.totalLength))
         return false;
       return true;
     } catch (IndexOutOfBoundsException e) {
@@ -144,68 +175,66 @@ public class PostingList implements Comparable<PostingList> {
   public boolean nextGEQ(int docid) {
 
     // if the posting list is already placed on a GEQ docid returns without changing list's iterator
-    if (this.postingList.get(this.postingList.position()) >= docid) {
+    if (this.didlist.get(this.didlist.position()) >= docid) {
       return true;
     }
 
     // if the posting list is over immediately returns false
-    if ((this.postingList.position() + postingSize) >= this.postingList.capacity())
+    if ((this.didlist.position() + 1) >= this.didlist.capacity())
       return false;
 
     // checks the immediately next docid to not perform more iterations than a simple next would
-    if (this.postingList.get(this.postingList.position() + postingSize) >= docid) {
-      this.postingList.position(this.postingList.position() + postingSize);
+    if (this.didlist.get(this.didlist.position() + 1) >= docid) {
+      this.didlist.position(this.didlist.position() + 1);
+      this.frqlist.position(this.didlist.position());
       return true;
     }
 
     // initializes binary search parameters
-    int rightOffset = this.postingList.capacity();
-    int rightPosition = ((int) rightOffset / 2);
+    int rightPosition = this.didlist.capacity();
 
     // checks if the last docid of the list is lower or equal to the argument
-    if (this.postingList.get(rightOffset - postingSize) < docid) {
+    if (this.didlist.get(rightPosition - 1) < docid) {
       return false;
-    } else if (this.postingList.get(rightOffset - postingSize) == docid) {
-      this.postingList.position(rightOffset - postingSize);
+    } else if (this.didlist.get(rightPosition - 1) == docid) {
+      this.didlist.position(rightPosition - 1);
+      this.frqlist.position(this.didlist.position());
       return true;
     }
 
     // initializes middle and left offsets for the binary search
-    int leftOffset = this.postingList.position() + postingSize;
-    int leftPosition = ((int) (leftOffset) / 2);
+    int leftPosition = this.didlist.position() + 1;
     int middlePosition = (~~((leftPosition + rightPosition) / 2));
-    int middleOffset = middlePosition * 2;
 
     // binary search
-    while (this.postingList.get(middleOffset) != docid) {
+    while (this.didlist.get(middlePosition) != docid) {
       // if the element should be between right and left but there is no element it means the nextGEQ is the right's docid
       if ((rightPosition - leftPosition) == 1) {
-        if (rightOffset == this.postingList.capacity())
+        if (rightPosition == this.didlist.capacity())
           return false;
-        this.postingList.position(rightOffset);
+        this.didlist.position(rightPosition);
+        this.frqlist.position(this.didlist.position());
         return true;
       }
 
       // re-computes the middle of the list relatively to left and right
-      int midVal = this.postingList.get(middleOffset);
+      int midVal = this.didlist.get(middlePosition);
       if (docid > midVal) {
         leftPosition = middlePosition;
-        leftOffset = middleOffset;
       } else {
         rightPosition = middlePosition;
-        rightOffset = middleOffset;
       }
       middlePosition = ~~((leftPosition + rightPosition) / 2);
-      middleOffset = middlePosition * 2;
     }
 
     // if the while ends it means the middle element is == docid so the iterator is placed on it
-    this.postingList.position(middleOffset);
+    this.didlist.position(middlePosition);
+    this.frqlist.position(this.didlist.position());
     return true;
   }
 
   public boolean isover() {
-    return this.postingList.position() >= this.postingList.capacity();
+    return this.didlist.position() >= this.didlist.capacity();
   }
 
   /**

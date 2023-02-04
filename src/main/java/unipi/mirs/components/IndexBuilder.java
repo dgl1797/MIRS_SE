@@ -31,7 +31,7 @@ public class IndexBuilder {
   /*opened once for the entire building process*/ private BufferedWriter doctable;
   /*resettable*/ private int currentDocID = 0;
   /*unresettable*/ private int currentChunkID = 0;
-  private static final int CHUNKSIZE = 524_288; // 2^19
+  private static final int CHUNKSIZE = 524_288; // 2^19 number of documents in any chunk
   private String SELECTED_PATH = null;
   private boolean stopnostem = false;
 
@@ -96,16 +96,21 @@ public class IndexBuilder {
     int cid = currentChunkID;
 
     // FORMAT FILENAMES
-    String chunkinvertedindexname = String.format("inverted_index_%d.dat", currentChunkID);
+    String chunkdocidindexname = String.format("docids_%d.dat", currentChunkID);
+    String chunkfrequenciesname = String.format("frequencies_%d.dat", currentChunkID);
     String chunkdebugname = String.format("debug_%d.dbg", currentChunkID);
     String chunkvocabularyname = String.format("lexicon_%d.dat", currentChunkID);
 
     // OPEN FILES
-    File chunkinvertedindex = Paths.get(SELECTED_PATH, chunkinvertedindexname).toFile();
+    File chunkdocidindex = Paths.get(SELECTED_PATH, chunkdocidindexname).toFile();
+    File chunkfrequencyindex = Paths.get(SELECTED_PATH, chunkfrequenciesname).toFile();
     File chunkdebug = Paths.get(SELECTED_PATH, chunkdebugname).toFile();
     File chunkvocabulary = Paths.get(SELECTED_PATH, chunkvocabularyname).toFile();
-    if (chunkinvertedindex.exists()) {
-      chunkinvertedindex.delete();
+    if (chunkdocidindex.exists()) {
+      chunkdocidindex.delete();
+    }
+    if (chunkfrequencyindex.exists()) {
+      chunkfrequencyindex.delete();
     }
     if (chunkdebug.exists() && debugmode) {
       chunkdebug.delete();
@@ -113,13 +118,15 @@ public class IndexBuilder {
     if (chunkvocabulary.exists()) {
       chunkvocabulary.delete();
     }
-    chunkinvertedindex.createNewFile();
+    chunkdocidindex.createNewFile();
     chunkvocabulary.createNewFile();
+    chunkfrequencyindex.createNewFile();
     if (debugmode)
       chunkdebug.createNewFile();
 
     // PREPARE DATA STREAMS
-    FileOutputStream iiw = new FileOutputStream(chunkinvertedindex);
+    FileOutputStream didw = new FileOutputStream(chunkdocidindex);
+    FileOutputStream frqw = new FileOutputStream(chunkfrequencyindex);
     BufferedWriter vcw = new BufferedWriter(new FileWriter(chunkvocabulary));
     BufferedWriter dbgw = null;
     if (debugmode) {
@@ -129,37 +136,29 @@ public class IndexBuilder {
     // LOOP OVER THE ENTRIES OF THE CHUNK TO WRITE DOWN FILES
     long currentByte = 0;
     for (Entry<String, ArrayList<int[]>> en : chunk.entrySet()) {
-      // update startByte
-      long startByte = currentByte;
+      // int[0] is the docid and int[1] is the frequency
       int plLength = en.getValue().size();
-
-      // write vocabulary row and debug key
-      vcw.write(String.format("%s\t%d-%d\n", en.getKey(), startByte, plLength));
+      vcw.write(String.format("%s\t%d-%d\n", en.getKey(), currentByte, plLength));
       if (debugmode) {
         dbgw.write(en.getKey() + "\t");
         dbgw.write("size: " + plLength + " -> ");
       }
-
-      // create the binary format of the posting list for the term
-      ByteBuffer b = ByteBuffer.allocate(2 * Integer.BYTES * plLength);
-      for (int[] node : en.getValue()) {
-        // [0] is docid [1] is frequency
-        b = b.putInt(node[0]).putInt(node[1]);
-        if (debugmode) {
-          dbgw.write(String.format("%d:%d - ", node[0], node[1]));
-        }
-        currentByte += 2 * Integer.BYTES;
+      ByteBuffer didbuffer = ByteBuffer.allocate(plLength * Integer.BYTES);
+      ByteBuffer frqbuffer = ByteBuffer.allocate(plLength * Integer.BYTES);
+      for (int[] x : en.getValue()) {
+        didbuffer.putInt(x[0]);
+        frqbuffer.putInt(x[1]);
+        currentByte += Integer.BYTES;
       }
-
-      // write the binary representation of the posting list
-      iiw.write(b.array());
-      if (debugmode) {
-        dbgw.write("\n");
-      }
+      didw.write(didbuffer.array());
+      frqw.write(frqbuffer.array());
     }
-
+    if (debugmode) {
+      dbgw.write("\n");
+    }
     // CLOSE RESOURCES
-    iiw.close();
+    didw.close();
+    frqw.close();
     vcw.close();
     if (debugmode || dbgw != null) {
       dbgw.close();
@@ -239,8 +238,11 @@ public class IndexBuilder {
     if (li == ri) {
       // RENAME REMAINING FILE TO MATCH THE INCREMENTAL COUNT
       ConsoleUX.DebugLog("Renaming chunks _" + li + " to _" + newindex);
-      Path oldPath = Paths.get(SELECTED_PATH, String.format("inverted_index_%d.dat", li));
-      Path newPath = Paths.get(SELECTED_PATH, String.format("inverted_index_%d.dat", newindex));
+      Path oldPath = Paths.get(SELECTED_PATH, String.format("docids_%d.dat", li));
+      Path newPath = Paths.get(SELECTED_PATH, String.format("docids_%d.dat", newindex));
+      rename(oldPath, newPath);
+      oldPath = Paths.get(SELECTED_PATH, String.format("frequencies_%d.dat", li));
+      newPath = Paths.get(SELECTED_PATH, String.format("frequencies_%d.dat", newindex));
       rename(oldPath, newPath);
 
       // RENAME DEBUG FILES TOO
@@ -259,18 +261,24 @@ public class IndexBuilder {
       // OPEN LEFT; RIGHT AND TMP FILES FOR THE CHUNK MERGING
       ConsoleUX.DebugLog("Merging chunks _" + li + " and _" + ri + " into _" + newindex);
       // [0] is left, [1] is right, [2] is tmp
-      File[] iiFiles = getFiles("inverted_index", li, ri);
+      File[] didFiles = getFiles("docids", li, ri);
+      File[] frqFiles = getFiles("frequencies", li, ri);
       File[] dbgFiles = debugmode ? getFiles("debug", li, ri) : null;
       File[] lsFiles = getFiles("lexicon", li, ri);
 
-      // OPEN THE STREAMS
+      // OPEN THE STREAM READERS
       BufferedReader[] lexicons = new BufferedReader[] { new BufferedReader(new FileReader(lsFiles[0])),
           new BufferedReader(new FileReader(lsFiles[1])) };
-      FileInputStream[] invindexes = new FileInputStream[] { new FileInputStream(iiFiles[0]),
-          new FileInputStream(iiFiles[1]) };
+      FileInputStream[] didindexes = new FileInputStream[] { new FileInputStream(didFiles[0]),
+          new FileInputStream(didFiles[1]) };
+      FileInputStream[] frqindexes = new FileInputStream[] { new FileInputStream(frqFiles[0]),
+          new FileInputStream(frqFiles[1]) };
+
+      // OPEN THE STREAM WRITERS
       BufferedWriter newLexicon = new BufferedWriter(new FileWriter(lsFiles[2]));
       BufferedWriter debugWriter = debugmode ? new BufferedWriter(new FileWriter(dbgFiles[2])) : null;
-      FileOutputStream newInvindex = new FileOutputStream(iiFiles[2]);
+      FileOutputStream newdidIndex = new FileOutputStream(didFiles[2]);
+      FileOutputStream newfrqIndex = new FileOutputStream(frqFiles[2]);
 
       // READ LEFT AND RIGHT TERMS FOR MERGE COMPARISON
       String leftTerm = lexicons[0].readLine();
@@ -279,12 +287,14 @@ public class IndexBuilder {
       while (leftTerm != null || rightTerm != null) {
         if (leftTerm == null) {
           // only rightTerms remain
-          loadFileinto(lexicons[1], invindexes[1], newLexicon, newInvindex, debugWriter, currentByte, rightTerm);
+          loadFileinto(lexicons[1], didindexes[1], frqindexes[1], newLexicon, newdidIndex, newfrqIndex, debugWriter,
+              currentByte, rightTerm);
           break;
         }
         if (rightTerm == null) {
           // only leftTerms remain
-          loadFileinto(lexicons[0], invindexes[0], newLexicon, newInvindex, debugWriter, currentByte, leftTerm);
+          loadFileinto(lexicons[0], didindexes[0], frqindexes[0], newLexicon, newdidIndex, newfrqIndex, debugWriter,
+              currentByte, leftTerm);
           break;
         }
         // TAKE LEFT AND RIGHT TERMS AND THEIR RESPECTIVE INFOS
@@ -293,63 +303,80 @@ public class IndexBuilder {
 
         if (leftmodel.term.equals(rightmodel.term)) {
           // concatenate right's posting to left's posting
-          byte[] bl = invindexes[0].readNBytes((leftmodel.plLength) * 2 * Integer.BYTES);
-          byte[] br = invindexes[1].readNBytes((rightmodel.plLength) * 2 * Integer.BYTES);
-          byte[] result = ByteBuffer.allocate(bl.length + br.length).put(bl).put(br).array();
+          byte[] dl = didindexes[0].readNBytes((leftmodel.plLength) * Integer.BYTES);
+          byte[] dr = didindexes[1].readNBytes((rightmodel.plLength) * Integer.BYTES);
+
+          byte[] fl = frqindexes[0].readNBytes((leftmodel.plLength) * Integer.BYTES);
+          byte[] fr = frqindexes[1].readNBytes((rightmodel.plLength) * Integer.BYTES);
+
+          byte[] dresult = ByteBuffer.allocate(dl.length + dr.length).put(dl).put(dr).array();
+          byte[] fresult = ByteBuffer.allocate(fl.length + fr.length).put(fl).put(fr).array();
 
           // write to tmp files
           newLexicon.write(
               String.format("%s\t%d-%d\n", leftmodel.term, currentByte, (leftmodel.plLength) + (rightmodel.plLength)));
-          newInvindex.write(result);
+          newdidIndex.write(dresult);
+          newfrqIndex.write(fresult);
           if (debugmode) {
-            debugWriter.write(String.format("%s\t%d -> %s\n", leftmodel.term,
-                (leftmodel.plLength) + (rightmodel.plLength), byteBufferToString(ByteBuffer.wrap(result))));
+            debugWriter
+                .write(String.format("%s\t%d -> %s%s\n", leftmodel.term, (leftmodel.plLength) + (rightmodel.plLength),
+                    byteBufferToString(ByteBuffer.wrap(dresult)), byteBufferToString(ByteBuffer.wrap(fresult))));
           }
 
           // advance both the files
           leftTerm = lexicons[0].readLine();
           rightTerm = lexicons[1].readLine();
-          currentByte += result.length;
+          currentByte += dresult.length;
 
         } else if (leftmodel.term.compareTo(rightmodel.term) < 0) {
           // lterm comes before rterm
-          byte[] bl = invindexes[0].readNBytes((leftmodel.plLength) * 2 * Integer.BYTES);
+          byte[] dl = didindexes[0].readNBytes((leftmodel.plLength) * Integer.BYTES);
+          byte[] fl = frqindexes[0].readNBytes((leftmodel.plLength) * Integer.BYTES);
+
           newLexicon.write(String.format("%s\t%d-%d\n", leftmodel.term, currentByte, (leftmodel.plLength)));
-          newInvindex.write(bl);
+          newdidIndex.write(dl);
+          newfrqIndex.write(fl);
           if (debugmode) {
-            debugWriter.write(String.format("%s\t%d -> %s\n", leftmodel.term, (leftmodel.plLength),
-                byteBufferToString(ByteBuffer.wrap(bl))));
+            debugWriter.write(String.format("%s\t%d -> %s%s\n", leftmodel.term, (leftmodel.plLength),
+                byteBufferToString(ByteBuffer.wrap(dl)), byteBufferToString(ByteBuffer.wrap(fl))));
           }
           leftTerm = lexicons[0].readLine();
-          currentByte += bl.length;
+          currentByte += dl.length;
         } else {
           // rterm comes before rterm
-          byte[] br = invindexes[1].readNBytes((rightmodel.plLength) * 2 * Integer.BYTES);
+          byte[] dr = didindexes[1].readNBytes((rightmodel.plLength) * Integer.BYTES);
+          byte[] fr = frqindexes[1].readNBytes((rightmodel.plLength) * Integer.BYTES);
           newLexicon.write(String.format("%s\t%d-%d\n", rightmodel.term, currentByte, (rightmodel.plLength)));
-          newInvindex.write(br);
+          newdidIndex.write(dr);
+          newfrqIndex.write(fr);
           if (debugmode) {
             debugWriter.write(String.format("%s\t%d -> %s\n", rightmodel.term, (rightmodel.plLength),
-                byteBufferToString(ByteBuffer.wrap(br))));
+                byteBufferToString(ByteBuffer.wrap(dr)), byteBufferToString(ByteBuffer.wrap(fr))));
           }
           rightTerm = lexicons[1].readLine();
-          currentByte += br.length;
+          currentByte += dr.length;
         }
       }
 
       // closing all the buffers
       lexicons[0].close();
       lexicons[1].close();
-      invindexes[0].close();
-      invindexes[1].close();
+      didindexes[0].close();
+      didindexes[1].close();
+      frqindexes[0].close();
+      frqindexes[1].close();
       newLexicon.close();
-      newInvindex.close();
+      newdidIndex.close();
+      newfrqIndex.close();
       if (debugmode || debugWriter != null)
         debugWriter.close();
 
       // delete old files, rename tmp file into _newindex
       //  CLEANING INDEX FILES
-      while (!iiFiles[0].delete());
-      while (!iiFiles[1].delete());
+      while (!didFiles[0].delete());
+      while (!didFiles[1].delete());
+      while (!frqFiles[0].delete());
+      while (!frqFiles[1].delete());
       //  CLEANING LEXICON FILES
       while (!lsFiles[0].delete());
       while (!lsFiles[1].delete());
@@ -360,7 +387,8 @@ public class IndexBuilder {
       }
 
       // RENAIMING OF THE FILES TO AVOID ISSUES WITH DELETE IT HAS BEEN SEPARATED FROM THE CLEANING STEPS
-      while (!iiFiles[2].renameTo(getNewFileName("inverted_index", newindex)));
+      while (!didFiles[2].renameTo(getNewFileName("docids", newindex)));
+      while (!frqFiles[2].renameTo(getNewFileName("frequencies", newindex)));
       while (!lsFiles[2].renameTo(getNewFileName("lexicon", newindex)));
       if (debugmode) {
         while (!dbgFiles[2].renameTo(getNewFileName("debug", newindex)));
@@ -495,8 +523,9 @@ public class IndexBuilder {
    * @param currentTerm the last term read from lexicon
    * @throws IOException
    */
-  private void loadFileinto(BufferedReader lexicon, FileInputStream invindex, BufferedWriter newLexicon,
-      FileOutputStream newInvindex, BufferedWriter newDebug, long currentByte, String currentTerm) throws IOException {
+  private void loadFileinto(BufferedReader lexicon, FileInputStream didindex, FileInputStream frqindex,
+      BufferedWriter newLexicon, FileOutputStream newdidIndex, FileOutputStream newfrqIndex, BufferedWriter newDebug,
+      long currentByte, String currentTerm) throws IOException {
 
     // LOOP OVER THE REMAINING TERMS IN THE LEXICON TO UPDATE THE TMP FILES
     do {
@@ -504,18 +533,21 @@ public class IndexBuilder {
       VocabularyModel model = new VocabularyModel(currentTerm, false);
 
       // save posting list into byte[]
-      byte[] pl = invindex.readNBytes(2 * Integer.BYTES * (model.plLength));
+      int size = Integer.BYTES * (model.plLength);
+      byte[] dpl = didindex.readNBytes(size);
+      byte[] gpl = frqindex.readNBytes(size);
 
       // update tmp files
       newLexicon.write(String.format("%s\t%d-%d\n", model.term, currentByte, (model.plLength)));
       if (debugmode) {
-        newDebug.write(
-            String.format("%s\t%d -> %s\n", model.term, (model.plLength), byteBufferToString(ByteBuffer.wrap(pl))));
+        newDebug.write(String.format("%s\t%d -> %s\n", model.term, (model.plLength),
+            byteBufferToString(ByteBuffer.wrap(dpl)), byteBufferToString(ByteBuffer.wrap(gpl))));
       }
-      newInvindex.write(pl);
+      newdidIndex.write(dpl);
+      newfrqIndex.write(gpl);
 
       // prepare next iteration
-      currentByte += pl.length;
+      currentByte += size;
     } while ((currentTerm = lexicon.readLine()) != null);
   }
 

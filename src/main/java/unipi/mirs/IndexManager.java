@@ -118,42 +118,58 @@ public class IndexManager {
     DocTable dTable = DocTable.loadDocTable(stopnostem_mode);
     Path workingDirectory = (!stopnostem_mode) ? Constants.OUTPUT_DIR : Constants.UNFILTERED_INDEX;
     File lexicon = Paths.get(workingDirectory.toString(), "lexicon.dat").toFile();
-    File invindex = Paths.get(workingDirectory.toString(), "inverted_index.dat").toFile();
+    File docids = Paths.get(workingDirectory.toString(), "docids.dat").toFile();
+    File frequencies = Paths.get(workingDirectory.toString(), "frequencies.dat").toFile();
     if (!lexicon.exists())
       throw new IOException("Impossible to proceed, lexicon file doesn't exist");
-    if (!invindex.exists())
-      throw new IOException("Impossible to proceed, inverted index file doesn't exist");
+    if (!docids.exists())
+      throw new IOException("Impossible to proceed, inverted documents file doesn't exist");
+    if (!frequencies.exists())
+      throw new IOException("Impossible to proceed, frequencies index file doesn't exist");
 
     // OPENING LEXICON AND INVERTED INDEX
     BufferedReader lr = new BufferedReader(new FileReader(lexicon));
-    FileInputStream iir = new FileInputStream(invindex);
+    FileInputStream didr = new FileInputStream(docids);
+    FileInputStream frqr = new FileInputStream(frequencies);
 
     // CREATE TMP FILES WHERE TO SAVE NEW INFOS
     File tmp_lexicon = Paths.get(workingDirectory.toString(), "lexicon_tmp.dat").toFile();
-    File tmp_invindex = Paths.get(workingDirectory.toString(), "inverted_index_tmp.dat").toFile();
+    File tmp_docids = Paths.get(workingDirectory.toString(), "docids_tmp.dat").toFile();
+    File tmp_frequencies = Paths.get(workingDirectory.toString(), "frequencies_tmp.dat").toFile();
+
     if (tmp_lexicon.exists())
       while (!tmp_lexicon.delete());
-    if (tmp_invindex.exists())
-      while (!tmp_invindex.delete());
+    if (tmp_docids.exists())
+      while (!tmp_docids.delete());
+    if (tmp_frequencies.exists())
+      while (!tmp_frequencies.delete());
     while (!tmp_lexicon.createNewFile());
-    while (!tmp_invindex.createNewFile());
+    while (!tmp_docids.createNewFile());
+    while (!tmp_frequencies.createNewFile());
+
     BufferedWriter lw = new BufferedWriter(new FileWriter(tmp_lexicon));
-    FileOutputStream iiw = new FileOutputStream(tmp_invindex);
+    FileOutputStream didw = new FileOutputStream(tmp_docids);
+    FileOutputStream frqw = new FileOutputStream(tmp_frequencies);
 
     // WRITE NEW INFO INTO TMPS
     String terminfos;
-    long currentByte = 0;
+    long dcurrentByte = 0;
+    long fcurrentByte = 0;
     while ((terminfos = lr.readLine()) != null) {
-      // READ POSTING LIST INTO INT_BUFFER
       VocabularyModel model = new VocabularyModel(terminfos, false);
-      ByteBuffer plBuffer = ByteBuffer.wrap(iir.readNBytes(model.plLength * 2 * Integer.BYTES));
-      IntBuffer pl = ByteBuffer.wrap(plBuffer.array()).asIntBuffer();
+
+      // READ POSTING LIST INTO INT_BUFFER
+      ByteBuffer didBuffer = ByteBuffer.wrap(didr.readNBytes(model.plLength * Integer.BYTES));
+      IntBuffer did = ByteBuffer.wrap(didBuffer.array()).asIntBuffer();
+
+      ByteBuffer frqBuffer = ByteBuffer.wrap(frqr.readNBytes(model.plLength * Integer.BYTES));
+      IntBuffer frq = ByteBuffer.wrap(frqBuffer.array()).asIntBuffer();
 
       // EVAL UPPER BOUND
       double upperbound = -1;
-      while (pl.position() < pl.capacity()) {
-        long doclen = dTable.doctable.get(pl.get()).doclen;
-        int tf = pl.get();
+      while (did.position() < did.capacity()) {
+        long doclen = dTable.doctable.get(did.get()).doclen;
+        int tf = frq.get();
         double score = ((tf) / (Constants.K_ONE * ((1 - Constants.B) + (Constants.B * doclen / dTable.avgDocLen)) + tf)
             * Math.log10((double) dTable.ndocs / (double) model.plLength));
         upperbound = score > upperbound ? score : upperbound;
@@ -161,29 +177,37 @@ public class IndexManager {
 
       // WRITE POSTING LIST INTO TMP FILE WITH UPPER BOUND AS INITIAL VALUE
       ByteBuffer ubBuffer = ByteBuffer.allocate(Double.BYTES).putDouble(upperbound);
-      iiw.write(ubBuffer.array());
-      iiw.write(plBuffer.array());
+      didw.write(ubBuffer.array());
+      didw.write(didBuffer.array());
+      // lexicon got reshuffled by hashmap so it is necessary to also rewrite the correct frequency buffer
+      frqw.write(frqBuffer.array());
 
       // UPDATE TMP LEXICON
-      lw.write(String.format("%s\t%d-%d\n", model.term, currentByte, model.plLength));
-      currentByte += (Double.BYTES + (2 * Integer.BYTES * model.plLength));
+      lw.write(String.format("%s\t%d-%d-%d\n", model.term, dcurrentByte, model.plLength, fcurrentByte));
+      dcurrentByte += (Double.BYTES + (Integer.BYTES * model.plLength));
+      fcurrentByte += (Integer.BYTES * model.plLength);
     }
 
     // CLOSE STREAMS
+    didr.close();
     lr.close();
-    iir.close();
+    frqr.close();
     lw.close();
-    iiw.close();
+    didw.close();
+    frqw.close();
 
     // DELETE OLD FILES
     while (!lexicon.delete());
-    while (!invindex.delete());
+    while (!docids.delete());
+    while (!frequencies.delete());
 
     // RENAME TMPS
     File dst = Paths.get(workingDirectory.toString(), "lexicon.dat").toFile();
     while (!tmp_lexicon.renameTo(dst));
-    dst = Paths.get(workingDirectory.toString(), "inverted_index.dat").toFile();
-    while (!tmp_invindex.renameTo(dst));
+    dst = Paths.get(workingDirectory.toString(), "docids.dat").toFile();
+    while (!tmp_docids.renameTo(dst));
+    dst = Paths.get(workingDirectory.toString(), "frequencies.dat").toFile();
+    while (!tmp_frequencies.renameTo(dst));
   }
 
   /**
@@ -255,21 +279,30 @@ public class IndexManager {
       // RENAME LAST CHUNK TO REMOVE THE _0
       String OUTPUT_LOCATION = stopnostem_mode ? Constants.UNFILTERED_INDEX.toString()
           : Constants.OUTPUT_DIR.toString();
-      File lastchunk = Paths.get(OUTPUT_LOCATION, "inverted_index_0.dat").toFile();
+      File lastchunk_doc = Paths.get(OUTPUT_LOCATION, "docids_0.dat").toFile();
+      File lastchunk_freq = Paths.get(OUTPUT_LOCATION, "frequencies_0.dat").toFile();
+      if (!lastchunk_doc.exists()) {
+        throw new IOException(
+            "Unexpected error in the merging phase: " + lastchunk_doc.toString() + " should exist but doesn't");
+      }
+      if (!lastchunk_freq.exists()) {
+        throw new IOException(
+            "Unexpected error in the merging phase: " + lastchunk_freq.toString() + " should exist but doesn't");
+      }
+      File finalName_doc = Paths.get(OUTPUT_LOCATION, "docids.dat").toFile();
+      File finalName_freq = Paths.get(OUTPUT_LOCATION, "frequencies.dat").toFile();
+      if (finalName_doc.exists())
+        finalName_doc.delete();
+      while (!lastchunk_doc.renameTo(finalName_doc));
+      if (finalName_freq.exists())
+        finalName_freq.delete();
+      while (!lastchunk_freq.renameTo(finalName_freq));
+      File lastchunk = Paths.get(OUTPUT_LOCATION, "lexicon_0.dat").toFile();
       if (!lastchunk.exists()) {
         throw new IOException(
             "Unexpected error in the merging phase: " + lastchunk.toString() + " should exist but doesn't");
       }
-      File finalName = Paths.get(OUTPUT_LOCATION, "inverted_index.dat").toFile();
-      if (finalName.exists())
-        finalName.delete();
-      while (!lastchunk.renameTo(finalName));
-      lastchunk = Paths.get(OUTPUT_LOCATION, "lexicon_0.dat").toFile();
-      if (!lastchunk.exists()) {
-        throw new IOException(
-            "Unexpected error in the merging phase: " + lastchunk.toString() + " should exist but doesn't");
-      }
-      finalName = Paths.get(OUTPUT_LOCATION, "lexicon.dat").toFile();
+      File finalName = Paths.get(OUTPUT_LOCATION, "lexicon.dat").toFile();
       if (finalName.exists())
         finalName.delete();
       while (!lastchunk.renameTo(finalName));
@@ -314,8 +347,10 @@ public class IndexManager {
    * @throws IOException
    */
   private static void compressIndex() throws IOException {
-    FileInputStream iir = null;
-    FileOutputStream iiw = null;
+    FileInputStream didr = null;
+    FileOutputStream didw = null;
+    FileInputStream frqr = null;
+    FileOutputStream frqw = null;
     BufferedWriter lw = null;
     try {
       ConsoleUX.DebugLog(ConsoleUX.CLS + "Loading index...");
@@ -324,12 +359,19 @@ public class IndexManager {
 
       // OPEN INPUT INVERTED INDEX
       String InputLocation = stopnostem_mode ? Constants.UNFILTERED_INDEX.toString() : Constants.OUTPUT_DIR.toString();
-      // inverted index
-      File invindex = Paths.get(InputLocation, "inverted_index.dat").toFile();
-      if (!invindex.exists())
-        throw new IOException(stopnostem_mode ? "Unfiltered" : "Filtered" + " Inverted Index file doesn't exist");
-      iir = new FileInputStream(invindex);
-      // doctable
+      // DOCS AND FREQUENCIES
+      File docids = Paths.get(InputLocation, "docids.dat").toFile();
+      File frequencies = Paths.get(InputLocation, "frequencies.dat").toFile();
+      if (!docids.exists())
+        throw new IOException(
+            stopnostem_mode ? "Unfiltered" : "Filtered" + " Inverted Index file for docids doesn't exist");
+      if (!frequencies.exists())
+        throw new IOException(
+            stopnostem_mode ? "Unfiltered" : "Filtered" + " Inverted Index file for frequencies doesn't exist");
+      didr = new FileInputStream(docids);
+      frqr = new FileInputStream(frequencies);
+
+      // DOCTABLE
       File dtFile = Paths.get(InputLocation, "doctable.dat").toFile();
       if (!dtFile.exists())
         throw new IOException(stopnostem_mode ? "Unfiltered" : "Filtered" + " Inverted Index file doesn't exist");
@@ -338,47 +380,63 @@ public class IndexManager {
       String OutputLocation = stopnostem_mode
           ? Paths.get(Constants.UNFILTERED_INDEX.toString(), "compressed_index").toString()
           : Paths.get(Constants.OUTPUT_DIR.toString(), "compressed_index").toString();
-      File outIndex = Paths.get(OutputLocation, "inverted_index.dat").toFile();
-      // inverted index
-      if (outIndex.exists()) {
+      File outdocids = Paths.get(OutputLocation, "docids.dat").toFile();
+      File outfrequencies = Paths.get(OutputLocation, "frequencies.dat").toFile();
+
+      // DOCIDS AND FREQUENCIES
+      if (outdocids.exists()) {
         ConsoleUX.ErrorLog("inverted index already exists, operate in overwrite mode? [Y/n]", "");
         String answer = stdin.nextLine();
         if (answer.toLowerCase().equals("n") || answer.toLowerCase().equals("no"))
           throw new IOException("Aborted by the user");
-        while (!outIndex.delete());
+        while (!outdocids.delete());
       }
-      while (!outIndex.createNewFile());
-      // lexicon
+      while (!outdocids.createNewFile());
+      if (outfrequencies.exists()) {
+        while (!outfrequencies.delete());
+      }
+      while (!outfrequencies.createNewFile());
+
+      // LEXICON
       File outLexicon = Paths.get(OutputLocation, "lexicon.dat").toFile();
       if (outLexicon.exists()) {
         while (!outLexicon.delete());
       }
       while (!outLexicon.createNewFile());
-      // doctable
+
+      // DOCTABLE
       File outDT = Paths.get(OutputLocation, "doctable.dat").toFile();
       Files.copy(dtFile.toPath(), outDT.toPath(), StandardCopyOption.REPLACE_EXISTING);
 
       // Buffers initializations
-      iiw = new FileOutputStream(outIndex);
+      didw = new FileOutputStream(outdocids);
+      frqw = new FileOutputStream(outfrequencies);
       lw = new BufferedWriter(new FileWriter(outLexicon, StandardCharsets.UTF_8));
 
       // START COMPRESSING POSTING LISTS READING LINE BY LINE AND COPYING IT INTO COMPRESSED_INDEX LOCATION
       ConsoleUX.DebugLog("Compressing Index into: " + OutputLocation);
-      long currentByte = 0;
+      long dcurrentbyte = 0;
+      long fcurrentbyte = 0;
       for (String key : lexicon.vocabulary.keySet()) {
         // load from files
-        long startByte = lexicon.vocabulary.get(key).startByte;
-        PostingList pl = PostingList.openList(key, startByte, lexicon.vocabulary.get(key).plLength, stopnostem_mode);
+        long dstartByte = lexicon.vocabulary.get(key).dstartByte;
+        long fstartByte = lexicon.vocabulary.get(key).fstartByte;
+        PostingList pl = PostingList.openList(key, dstartByte, fstartByte, lexicon.vocabulary.get(key).plLength,
+            stopnostem_mode);
 
         // compressing the read posting list
         CompressedPostingList cpl = CompressedPostingList.from(pl);
 
         // writing the compressed data
-        lw.write(String.format("%s\t%d-%d-%d\n", key, currentByte, pl.totalLength, cpl.getBuffer().capacity()));
+        lw.write(String.format("%s\t%d-%d-%d-%d-%d\n", key, dcurrentbyte, pl.totalLength, fcurrentbyte,
+            cpl.getDIDBuffer().capacity(), cpl.getFRQBuffer().capacity()));
+
         ByteBuffer ubb = ByteBuffer.allocate(Double.BYTES).putDouble(pl.upperBound);
-        iiw.write(ubb.array());
-        iiw.write(cpl.getBuffer().array());
-        currentByte += cpl.getBuffer().capacity() + Double.BYTES;
+        didw.write(ubb.array());
+        didw.write(cpl.getDIDBuffer().array());
+        frqw.write(cpl.getFRQBuffer().array());
+        dcurrentbyte += cpl.getDIDBuffer().capacity() + Double.BYTES;
+        fcurrentbyte += cpl.getFRQBuffer().capacity();
       }
       ConsoleUX.SuccessLog("Compression Successful");
       ConsoleUX.pause(true, stdin);
@@ -386,11 +444,17 @@ public class IndexManager {
       ConsoleUX.ErrorLog("Compression Failed:\n" + ioe.getMessage());
       ConsoleUX.pause(true, stdin);
     } finally {
-      if (iir != null) {
-        iir.close();
+      if (didr != null) {
+        didr.close();
       }
-      if (iiw != null) {
-        iiw.close();
+      if (didw != null) {
+        didw.close();
+      }
+      if (frqr != null) {
+        frqr.close();
+      }
+      if (frqw != null) {
+        frqw.close();
       }
       if (lw != null) {
         lw.close();

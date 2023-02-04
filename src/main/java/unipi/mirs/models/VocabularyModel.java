@@ -5,17 +5,21 @@ package unipi.mirs.models;
  */
 public class VocabularyModel {
   public String term;
-  public long startByte;
+  public long dstartByte;
+  public long fstartByte;
   public int plLength;
-  public int endByte;
+  public int dendByte;
+  public int fendByte;
 
   public VocabularyModel(String vocabularyLine, boolean compressed) {
     String[] parts = vocabularyLine.split("\t");
     this.term = parts[0];
     parts = parts[1].split("-");
-    this.startByte = Long.parseUnsignedLong(parts[0]);
+    this.dstartByte = Long.parseUnsignedLong(parts[0]);
     this.plLength = Integer.parseUnsignedInt(parts[1]);
-    this.endByte = compressed ? Integer.parseUnsignedInt(parts[2]) : plLength * 2 * Integer.BYTES;
+    this.fstartByte = parts.length >= 3 ? Long.parseUnsignedLong(parts[2]) : dstartByte;
+    this.dendByte = compressed ? Integer.parseUnsignedInt(parts[3]) : plLength * Integer.BYTES;
+    this.fendByte = compressed ? Integer.parseUnsignedInt(parts[4]) : plLength * Integer.BYTES;
   }
 
 }
