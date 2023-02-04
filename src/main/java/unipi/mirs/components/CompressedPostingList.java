@@ -124,11 +124,15 @@ public class CompressedPostingList implements Comparable<CompressedPostingList> 
     // checks the last docid of the posting list to verify the passed argument is inside the posting list 
     // backwards from last position until 1 is caught
     int dlastPosition = this.didlist.capacity() - 1;
-    for (; (this.didlist.get(dlastPosition - 1) & 128) == 0; dlastPosition--);
+    while ((this.didlist.get(dlastPosition - 1) & 128) == 0) {
+      dlastPosition--;
+    }
 
     // same for frequencies
     int flastPosition = this.frqlist.capacity() - 1;
-    for (; (this.frqlist.get(flastPosition - 1) & 128) == 0; flastPosition--);
+    while ((this.frqlist.get(flastPosition - 1) & 128) == 0) {
+      flastPosition--;
+    }
 
     // controls the lastdocid decoding a temporary buffer to not alter the postinglist iterator
     ByteBuffer tmp = this.didlist.slice(dlastPosition, this.didlist.capacity() - dlastPosition);
@@ -207,7 +211,7 @@ public class CompressedPostingList implements Comparable<CompressedPostingList> 
       tmp = this.frqlist.slice(fnewposition, Math.min(32, this.frqlist.capacity() - fnewposition));
       foldskiplength = tmp.position();
       foldskipoffset = VariableByteEncoder.decodeInt(tmp);
-      foldskiplength = tmp.position() - doldskiplength;
+      foldskiplength = tmp.position() - foldskiplength;
       foldskipposition = fnewposition;
     } while (reachedDocID < docid);
 
